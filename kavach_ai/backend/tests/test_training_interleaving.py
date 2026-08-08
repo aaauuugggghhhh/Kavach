@@ -14,7 +14,9 @@ import training.pipeline.data as data_module
 from training.pipeline.data import (
     Corpus,
     TokenShardIterableDataset,
+    class_selection_provenance,
     preflight_split,
+    selected_ids_for_epoch,
     select_smoke_records,
     validate_tokenizer,
 )
@@ -38,6 +40,19 @@ def _config(sampler_type: str = "standard", *, seed: int = 19, active: int = 4) 
             "smoke_examples": 8,
         },
     }
+
+
+def _balanced_config(*, seed: int = 19) -> dict:
+    config = _config("apk_interleaved", seed=seed)
+    config["data"]["class_selection"] = {
+        "type": "deterministic_undersample",
+        "retain_all_label": "Malicious",
+        "sample_label": "Benign",
+        "sample_count": "match_retain_all",
+        "cycle_each_epoch": True,
+    }
+    config["trainer"] = {"num_train_epochs": 3.0}
+    return config
 
 
 def _corpus(tmp_path: Path, *, apks: int = 12, examples_per_apk: int = 4) -> Corpus:
@@ -169,6 +184,59 @@ def test_interleaved_rejects_invalid_active_queue_bound(tmp_path: Path) -> None:
     checked = preflight_split(corpus, config, "train")
     with pytest.raises(ValueError, match="positive integer"):
         list(TokenShardIterableDataset(corpus, config, "train", checked))
+
+
+def test_balanced_selection_cycles_deterministically_before_interleaving(tmp_path: Path) -> None:
+    corpus = _corpus(tmp_path, apks=12, examples_per_apk=4)
+    # Three benign APKs for each malicious APK: 36 benign and 12 malicious slices.
+    for apk_number, apk_hash in enumerate(corpus.metadata):
+        label = "Malicious" if apk_number % 4 == 3 else "Benign"
+        corpus.metadata[apk_hash]["label"] = label
+        corpus.statistics[apk_hash]["label"] = label
+    config = _balanced_config(seed=23)
+    checked = preflight_split(corpus, config, "train")
+    assert checked.summary.class_counts == {"Benign": 36, "Malicious": 12}
+
+    memberships = [selected_ids_for_epoch(checked, config, "train", epoch) for epoch in range(3)]
+    assert memberships == [selected_ids_for_epoch(checked, config, "train", epoch) for epoch in range(3)]
+    malicious = {item["example_id"] for item in checked.records if item["label_name"] == "Malicious"}
+    benign_windows = []
+    for membership in memberships:
+        assert len(membership) == 24
+        assert malicious <= membership
+        benign = membership - malicious
+        assert len(benign) == 12
+        benign_windows.append(benign)
+    assert len(set().union(*benign_windows)) == 36
+    assert len({frozenset(window) for window in benign_windows}) == 3
+
+    dataset = TokenShardIterableDataset(corpus, config, "train", checked)
+    assert len(dataset) == 24
+    for epoch, membership in enumerate(memberships):
+        dataset.set_epoch(epoch)
+        yielded = _tokens(dataset)
+        assert len(yielded) == len(dataset) == 24
+        assert len(set(yielded)) == 24
+        expected_tokens = {
+            apk_number * 100 + example_number + 1
+            for apk_number in range(12) for example_number in range(4)
+            if f"{apk_number:064x}:{example_number}" in membership
+        }
+        assert set(yielded) == expected_tokens
+        assert dataset.peak_resident_queues <= 4
+
+    provenance = class_selection_provenance(checked, config, "train")
+    assert provenance is not None
+    assert [item["record_count"] for item in provenance["epochs"]] == [24, 24, 24]
+    assert len({item["membership_sha256"] for item in provenance["epochs"]}) == 3
+
+
+def test_class_selection_never_changes_non_training_membership(tmp_path: Path) -> None:
+    corpus = _corpus(tmp_path, apks=4, examples_per_apk=2)
+    config = _balanced_config()
+    checked = preflight_split(corpus, config, "train")
+    assert selected_ids_for_epoch(checked, config, "validation", 2) == checked.eligible_ids
+    assert class_selection_provenance(checked, config, "validation") is None
 
 
 def test_loaded_tokenizer_can_be_validated_without_loading_again(tmp_path: Path) -> None:

@@ -121,6 +121,50 @@ class PreflightResult:
     rejections: tuple[Rejection, ...]
 
 
+def selected_ids_for_epoch(
+    preflight: PreflightResult, config: Mapping[str, Any], split: str, epoch: int,
+) -> frozenset[str]:
+    """Return deterministic training membership; evaluation remains natural."""
+    selection = config["data"].get("class_selection")
+    if selection is None or split != config["data"]["train_split"]:
+        return preflight.eligible_ids
+    if epoch < 0:
+        raise ValueError("epoch must be non-negative")
+    retain_label, sample_label = selection["retain_all_label"], selection["sample_label"]
+    retained = {item["example_id"] for item in preflight.records if item["label_name"] == retain_label}
+    sampled = [item["example_id"] for item in preflight.records if item["label_name"] == sample_label]
+    if not retained:
+        raise ValueError(f"No eligible {retain_label} records to retain")
+    if len(sampled) < len(retained):
+        raise ValueError(
+            f"Insufficient {sample_label} records: need {len(retained)}, found {len(sampled)}"
+        )
+    seed = config["run"]["seed"]
+    sampled.sort(key=lambda example_id: (_candidate_score(seed, example_id), example_id))
+    window = len(retained)
+    cycle_epoch = epoch if selection["cycle_each_epoch"] else 0
+    start = (cycle_epoch * window) % len(sampled)
+    chosen = {sampled[(start + offset) % len(sampled)] for offset in range(window)}
+    if len(chosen) != window:
+        raise RuntimeError("Class selection produced duplicate sampled records")
+    return frozenset(retained | chosen)
+
+
+def class_selection_provenance(
+    preflight: PreflightResult, config: Mapping[str, Any], split: str,
+) -> dict[str, Any] | None:
+    selection = config["data"].get("class_selection")
+    if selection is None or split != config["data"]["train_split"]:
+        return None
+    epochs = int(config["trainer"]["num_train_epochs"])
+    hashes = []
+    for epoch in range(epochs):
+        identifiers = sorted(selected_ids_for_epoch(preflight, config, split, epoch))
+        digest = hashlib.sha256(("\n".join(identifiers) + "\n").encode()).hexdigest()
+        hashes.append({"epoch": epoch + 1, "record_count": len(identifiers), "membership_sha256": digest})
+    return {"policy": dict(selection), "epochs": hashes}
+
+
 def _reject(reason: RejectionReason, apk_hash: str, item: Any, detail: str) -> Rejection:
     example_id = item.get("example_id") if isinstance(item, Mapping) else None
     return Rejection(reason, example_id if isinstance(example_id, str) else None, apk_hash, detail)
@@ -350,10 +394,12 @@ class TokenShardIterableDataset(IterableDataset):
         else:
             self.preflight = preflight
         self.seed, self.epoch = config["run"]["seed"], 0
+        self._selected_ids = selected_ids_for_epoch(self.preflight, self.config, self.split, 0)
+        self._declared_length = len(self._selected_ids)
         self.peak_resident_queues = 0
 
     def __len__(self) -> int:
-        return self.preflight.summary.count
+        return self._declared_length
 
     def set_epoch(self, epoch: int) -> None:
         self.epoch = epoch
@@ -363,6 +409,9 @@ class TokenShardIterableDataset(IterableDataset):
             raise RuntimeError("TokenShardIterableDataset currently requires dataloader_workers=0")
         sampler = self.config["data"]["sampler"]
         sampler_type = sampler["type"]
+        self._selected_ids = selected_ids_for_epoch(self.preflight, self.config, self.split, self.epoch)
+        if len(self._selected_ids) != len(self):
+            raise RuntimeError("Epoch class selection changed the declared dataset length")
         self.peak_resident_queues = 0
         if sampler_type == "standard":
             yield from self._iter_standard()
@@ -380,14 +429,14 @@ class TokenShardIterableDataset(IterableDataset):
         records = []
         for item in shard.get("examples", ()):
             result = prepare_record(item, apk_hash, self.corpus, self.config, expected_split=self.split)
-            if isinstance(result, PreparedRecord) and result.example_id in self.preflight.eligible_ids:
+            if isinstance(result, PreparedRecord) and result.example_id in self._selected_ids:
                 records.append(result)
         return records
 
     def _verify_yielded(self, yielded: set[str]) -> None:
-        if yielded != self.preflight.eligible_ids or len(yielded) != self.preflight.summary.count:
+        if yielded != self._selected_ids or len(yielded) != len(self):
             raise RuntimeError(
-                f"Iterable/preflight drift: yielded={len(yielded)} expected={len(self.preflight.eligible_ids)}"
+                f"Iterable/preflight drift: yielded={len(yielded)} expected={len(self._selected_ids)}"
             )
 
     def _iter_standard(self) -> Iterator[dict[str, Any]]:

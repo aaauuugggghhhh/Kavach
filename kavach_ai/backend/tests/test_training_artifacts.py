@@ -484,8 +484,10 @@ def test_training_artifacts_and_lifecycle_are_atomic_and_sanitized(tmp_path) -> 
     write_training_artifacts(
         tmp_path, environment={"device": "cpu"}, lora_targets={"matches": 22},
         trainable_parameters={"trainable": 1_132_802}, metrics={"f1": 0.5},
+        loss_policy={"training_loss_weighted": True, "evaluation_loss_weighted": False},
     )
     assert json.loads((tmp_path / "metrics.json").read_text()) == {"f1": 0.5}
+    assert json.loads((tmp_path / "loss-policy.json").read_text())["evaluation_loss_weighted"] is False
 
 
 def test_all_permanent_training_configs_are_strict_and_loadable() -> None:
@@ -493,12 +495,94 @@ def test_all_permanent_training_configs_are_strict_and_loadable() -> None:
     expected = {
         "dry_run.yaml": "dry_run", "smoke.yaml": "smoke",
         "tiny_overfit.yaml": "tiny_overfit", "train.yaml": "train",
+        "train_balanced_1to1.yaml": "train", "train_full_natural.yaml": "train",
+        "train_full_weighted.yaml": "train",
     }
     for name, mode in expected.items():
         config = load_config(root / "training" / "configs" / name)
         assert config["run"]["mode"] == mode
         assert config["data"]["exclude_internally_truncated"] is True
         assert config["trainer"]["dataloader_num_workers"] == 0
+
+
+def test_balanced_config_is_strict_and_existing_train_has_no_selection(tmp_path) -> None:
+    root = Path(__file__).parents[3] / "training" / "configs"
+    baseline = load_config(root / "train.yaml")
+    balanced = load_config(root / "train_balanced_1to1.yaml")
+    assert "class_selection" not in baseline["data"]
+    assert balanced["data"]["class_selection"] == {
+        "type": "deterministic_undersample",
+        "retain_all_label": "Malicious",
+        "sample_label": "Benign",
+        "sample_count": "match_retain_all",
+        "cycle_each_epoch": True,
+    }
+    text = (root / "train_balanced_1to1.yaml").read_text(encoding="utf-8")
+    invalid = tmp_path / "invalid.yaml"
+    invalid.write_text(text.replace("cycle_each_epoch: true", 'cycle_each_epoch: "true"'), encoding="utf-8")
+    with pytest.raises(ValueError, match="must be bool"):
+        load_config(invalid)
+    invalid.write_text(text.replace("sample_count: match_retain_all", "sample_count: 7661"), encoding="utf-8")
+    with pytest.raises(ValueError, match="must be str"):
+        load_config(invalid)
+    invalid.write_text(text.replace("sample_label: Benign", "sample_label: Malicious"), encoding="utf-8")
+    with pytest.raises(ValueError, match="must be distinct"):
+        load_config(invalid)
+
+
+def test_full_natural_config_differs_from_balanced_only_by_experiment_identity() -> None:
+    root = Path(__file__).parents[3] / "training" / "configs"
+    balanced = load_config(root / "train_balanced_1to1.yaml").serializable()
+    natural = load_config(root / "train_full_natural.yaml").serializable()
+    assert "class_selection" not in natural["data"]
+    assert natural["data"]["sampler"] == {"type": "apk_interleaved", "active_apk_shards": 8}
+
+    assert balanced["run"].pop("name") == "securebert-balanced-1to1"
+    assert natural["run"].pop("name") == "securebert-full-natural"
+    assert balanced["run"].pop("output_dir") == "training/outputs/securebert-balanced-1to1"
+    assert natural["run"].pop("output_dir") == "training/outputs/securebert-full-natural"
+    assert balanced["wandb"].pop("tags") == ["train", "balanced-1to1"]
+    assert natural["wandb"].pop("tags") == ["train", "full-natural"]
+    assert "1:1" in balanced["wandb"].pop("notes")
+    assert "natural-distribution" in natural["wandb"].pop("notes")
+    balanced["data"].pop("class_selection")
+    assert natural == balanced
+
+
+def test_full_weighted_config_is_strict_and_comparable_to_balanced(tmp_path) -> None:
+    root = Path(__file__).parents[3] / "training" / "configs"
+    balanced = load_config(root / "train_balanced_1to1.yaml").serializable()
+    weighted = load_config(root / "train_full_weighted.yaml").serializable()
+    assert "loss" not in balanced
+    assert "class_selection" not in weighted["data"]
+    assert weighted["loss"] == {
+        "type": "weighted_cross_entropy", "weighting": "balanced_from_train_counts",
+    }
+
+    assert balanced["run"].pop("name") == "securebert-balanced-1to1"
+    assert weighted["run"].pop("name") == "securebert-full-weighted"
+    balanced["run"].pop("output_dir")
+    weighted["run"].pop("output_dir")
+    balanced["wandb"].pop("tags")
+    weighted["wandb"].pop("tags")
+    balanced["wandb"].pop("notes")
+    weighted["wandb"].pop("notes")
+    balanced["data"].pop("class_selection")
+    weighted.pop("loss")
+    assert weighted == balanced
+
+    text = (root / "train_full_weighted.yaml").read_text(encoding="utf-8")
+    invalid = tmp_path / "invalid-weighted.yaml"
+    invalid.write_text(text.replace("balanced_from_train_counts", "validation_counts"), encoding="utf-8")
+    with pytest.raises(ValueError, match="Unsupported loss policy"):
+        load_config(invalid)
+    invalid.write_text(text.replace(
+        "  sampler: {type: apk_interleaved, active_apk_shards: 8}",
+        "  sampler: {type: apk_interleaved, active_apk_shards: 8}\n"
+        "  class_selection: {type: deterministic_undersample, retain_all_label: Malicious, sample_label: Benign, sample_count: match_retain_all, cycle_each_epoch: true}",
+    ), encoding="utf-8")
+    with pytest.raises(ValueError, match="cannot be combined"):
+        load_config(invalid)
 
 
 def test_new_schema_rejects_old_truncation_key_bad_sampler_and_seed_drift(tmp_path) -> None:

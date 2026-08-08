@@ -39,6 +39,71 @@ class TrainingRunResult:
     runtime_seconds: float
 
 
+@dataclass(frozen=True)
+class LossResolution:
+    type: str
+    weighting: str | None
+    train_class_counts: dict[str, int]
+    label_order: tuple[str, str]
+    class_weights: tuple[float, float] | None
+    training_loss_weighted: bool
+    evaluation_loss_weighted: bool
+
+    def serializable(self) -> dict[str, Any]:
+        weights = list(self.class_weights) if self.class_weights is not None else None
+        return {
+            "type": self.type, "weighting": self.weighting,
+            "train_class_counts": dict(self.train_class_counts),
+            "label_order": list(self.label_order), "class_weights": weights,
+            "label_to_weight": (dict(zip(self.label_order, weights)) if weights is not None else None),
+            "training_loss_weighted": self.training_loss_weighted,
+            "evaluation_loss_weighted": self.evaluation_loss_weighted,
+        }
+
+
+def resolve_loss_policy(
+    config: Mapping[str, Any], train_class_counts: Mapping[str, int] | None = None,
+) -> LossResolution:
+    policy = config.get("loss")
+    label_order = ("Benign", "Malicious")
+    counts = dict(train_class_counts or {})
+    if policy is None:
+        return LossResolution("cross_entropy", None, counts, label_order, None, False, False)
+    if set(counts) != set(label_order) or any(type(counts[label]) is not int or counts[label] <= 0 for label in label_order):
+        raise ValueError("Weighted loss requires positive finalized TRAIN counts for Benign and Malicious")
+    total = sum(counts.values())
+    weights = tuple(total / (len(label_order) * counts[label]) for label in label_order)
+    return LossResolution(
+        policy["type"], policy["weighting"], counts, label_order, weights, True, False,
+    )
+
+
+class ClassWeightedTrainer(Trainer):
+    """Apply class weights during optimization while keeping evaluation loss ordinary."""
+
+    def __init__(self, *args: Any, class_weights: tuple[float, float], **kwargs: Any) -> None:
+        self.class_weights = class_weights
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(self, model: Any, inputs: Mapping[str, Any], return_outputs: bool = False,
+                     num_items_in_batch: Any = None) -> Any:
+        del num_items_in_batch
+        model_inputs = dict(inputs)
+        labels = model_inputs.pop("labels", None)
+        if labels is None:
+            raise ValueError("ClassWeightedTrainer requires labels")
+        outputs = model(**model_inputs)
+        logits = outputs.get("logits") if isinstance(outputs, Mapping) else getattr(outputs, "logits", None)
+        if not torch.is_tensor(logits) or logits.ndim != 2 or logits.shape[1] != 2:
+            shape = tuple(logits.shape) if torch.is_tensor(logits) else None
+            raise ValueError(f"Expected two-class logits with shape [batch, 2], got {shape}")
+        weights = None
+        if model.training:
+            weights = torch.tensor(self.class_weights, device=logits.device, dtype=logits.dtype)
+        loss = torch.nn.CrossEntropyLoss(weight=weights)(logits, labels)
+        return (loss, outputs) if return_outputs else loss
+
+
 def _section(config: Mapping[str, Any], name: str) -> Mapping[str, Any]:
     value = config[name]
     if not isinstance(value, Mapping):
@@ -223,13 +288,19 @@ def build_training_arguments(config: Mapping[str, Any], output_dir: str | Path |
 def build_trainer(config: Mapping[str, Any], model: Any, train_dataset: Any, eval_dataset: Any,
                   data_collator: Any, processing_class: Any = None, *, output_dir: str | Path | None = None,
                   selected_records_hash: str | None = None,
-                  aggregate_counts: Mapping[str, Any] | None = None) -> Trainer:
+                  aggregate_counts: Mapping[str, Any] | None = None,
+                  loss_resolution: LossResolution | None = None) -> Trainer:
     configure_wandb_environment(config)
     arguments = build_training_arguments(config, output_dir)
-    instance = Trainer(model=model, args=arguments, train_dataset=train_dataset,
-                       eval_dataset=eval_dataset, data_collator=data_collator,
-                       processing_class=processing_class,
-                       compute_metrics=binary_classification_metrics)
+    resolved_loss = loss_resolution or resolve_loss_policy(config)
+    trainer_type: type[Trainer] = ClassWeightedTrainer if resolved_loss.training_loss_weighted else Trainer
+    weighted_kwargs = {"class_weights": resolved_loss.class_weights} if resolved_loss.training_loss_weighted else {}
+    instance = trainer_type(
+        model=model, args=arguments, train_dataset=train_dataset,
+        eval_dataset=eval_dataset, data_collator=data_collator,
+        processing_class=processing_class, compute_metrics=binary_classification_metrics,
+        **weighted_kwargs,
+    )
     if wandb_report_to(config):
         from transformers.integrations import WandbCallback
         instance.remove_callback(WandbCallback)

@@ -155,6 +155,7 @@ def write_training_artifacts(
     trainable_parameters: Mapping[str, Any],
     adapter_metadata: Mapping[str, Any] | None = None,
     metrics: Mapping[str, Any] | None = None,
+    loss_policy: Mapping[str, Any] | None = None,
 ) -> None:
     directory = Path(output)
     write_json_atomic(directory / "environment.json", sanitize_metadata(environment))
@@ -164,6 +165,8 @@ def write_training_artifacts(
         write_json_atomic(directory / "adapter-metadata.json", sanitize_metadata(adapter_metadata))
     if metrics is not None:
         write_json_atomic(directory / "metrics.json", sanitize_metadata(metrics))
+    if loss_policy is not None:
+        write_json_atomic(directory / "loss-policy.json", sanitize_metadata(loss_policy))
 
 
 def update_lifecycle(output: str | Path, status: str, **fields: Any) -> dict[str, Any]:

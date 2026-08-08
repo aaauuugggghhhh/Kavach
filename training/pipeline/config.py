@@ -27,6 +27,7 @@ CONFIG_KEYS = {
         "include_sink_categories", "exclude_sink_categories", "excluded_example_ids",
         "max_context_length", "context_policy", "tiny_examples", "tiny_candidate_pool",
         "tiny_disallowed_boundaries", "smoke_examples",
+        "class_selection",
     },
     "model": {"checkpoint", "tokenizer"},
     "lora": {"enabled", "task_type", "target_modules", "modules_to_save", "rank", "alpha", "dropout", "bias"},
@@ -40,7 +41,11 @@ CONFIG_KEYS = {
         "disable_tqdm", "seed", "data_seed", "pad_to_multiple_of",
     },
     "wandb": {"mode", "project", "entity", "group", "job_type", "tags", "notes", "log_model", "watch_model"},
+    "loss": {"type", "weighting"},
 }
+
+OPTIONAL_SECTION_KEYS = {"data": {"class_selection"}}
+OPTIONAL_TOP_LEVEL_KEYS = {"loss"}
 
 
 @dataclass(frozen=True)
@@ -100,22 +105,29 @@ def _string_list(value: Any, name: str, *, nullable: bool = False) -> None:
         raise ValueError(f"{name} must be a list of strings" + (" or null" if nullable else ""))
 
 
-def _validate_section(name: str, value: Any, allowed: set[str]) -> None:
+def _validate_section(name: str, value: Any, allowed: set[str], optional: set[str] = frozenset()) -> None:
     if not isinstance(value, dict):
         raise ValueError(f"Config section {name!r} must be a mapping")
-    extra, absent = set(value) - allowed, allowed - set(value)
+    extra, absent = set(value) - allowed, allowed - optional - set(value)
     if extra or absent:
         raise ValueError(f"Invalid {name} keys: missing={sorted(absent)}, unknown={sorted(extra)}")
 
 
 def validate_keys(config: Mapping[str, Any]) -> None:
-    unknown, missing = set(config) - set(CONFIG_KEYS), set(CONFIG_KEYS) - set(config)
+    unknown = set(config) - set(CONFIG_KEYS)
+    missing = set(CONFIG_KEYS) - OPTIONAL_TOP_LEVEL_KEYS - set(config)
     if unknown or missing:
         raise ValueError(f"Invalid top-level config keys: missing={sorted(missing)}, unknown={sorted(unknown)}")
     for section, allowed in CONFIG_KEYS.items():
-        if allowed is not None:
-            _validate_section(section, config[section], allowed)
+        if allowed is not None and section in config:
+            _validate_section(section, config[section], allowed, OPTIONAL_SECTION_KEYS.get(section, frozenset()))
     _validate_section("data.sampler", config["data"]["sampler"], {"type", "active_apk_shards"})
+    selection = config["data"].get("class_selection")
+    if selection is not None:
+        _validate_section(
+            "data.class_selection", selection,
+            {"type", "retain_all_label", "sample_label", "sample_count", "cycle_each_epoch"},
+        )
 
 
 def validate_config(config: Mapping[str, Any]) -> None:
@@ -125,6 +137,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError(f"Unsupported config schema: {config['schema_version']!r}")
     run, data, model = config["run"], config["data"], config["model"]
     lora, hardware, trainer, wandb = config["lora"], config["hardware"], config["trainer"], config["wandb"]
+    loss = config.get("loss")
 
     for key in ("mode", "name"):
         _require(run[key], str, f"run.{key}")
@@ -154,6 +167,21 @@ def validate_config(config: Mapping[str, Any]) -> None:
     _require(sampler["active_apk_shards"], int, "data.sampler.active_apk_shards")
     if sampler["type"] not in {"standard", "apk_interleaved"} or sampler["active_apk_shards"] <= 0:
         raise ValueError("Invalid sampler type or active_apk_shards")
+    selection = data.get("class_selection")
+    if selection is not None:
+        for key in ("type", "retain_all_label", "sample_label", "sample_count"):
+            _require(selection[key], str, f"data.class_selection.{key}")
+        _require(selection["cycle_each_epoch"], bool, "data.class_selection.cycle_each_epoch")
+        if selection["type"] != "deterministic_undersample":
+            raise ValueError("data.class_selection.type must be deterministic_undersample")
+        if selection["retain_all_label"] not in LABEL_IDS or selection["sample_label"] not in LABEL_IDS:
+            raise ValueError("data.class_selection labels must be Benign or Malicious")
+        if selection["retain_all_label"] == selection["sample_label"]:
+            raise ValueError("data.class_selection labels must be distinct")
+        if selection["sample_count"] != "match_retain_all":
+            raise ValueError("data.class_selection.sample_count must be match_retain_all")
+        if run["mode"] != "train":
+            raise ValueError("data.class_selection is supported only for run.mode=train")
     if data["train_split"] != "train" or data["eval_split"] != "validation":
         raise ValueError("Immutable train/validation splits are required")
     if data["context_policy"] != "head":
@@ -240,6 +268,19 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("pad_to_multiple_of must be positive or null")
     if run["seed"] != trainer["seed"] or run["seed"] != trainer["data_seed"]:
         raise ValueError("run.seed, trainer.seed, and trainer.data_seed must match")
+    if selection is not None and selection["cycle_each_epoch"]:
+        if not epochs.is_integer() or trainer["max_steps"] != -1:
+            raise ValueError("Epoch-cycling class selection requires whole num_train_epochs and max_steps=-1")
+
+    if loss is not None:
+        _require(loss["type"], str, "loss.type")
+        _require(loss["weighting"], str, "loss.weighting")
+        if loss != {"type": "weighted_cross_entropy", "weighting": "balanced_from_train_counts"}:
+            raise ValueError("Unsupported loss policy")
+        if run["mode"] != "train":
+            raise ValueError("Weighted loss is supported only for run.mode=train")
+        if selection is not None:
+            raise ValueError("Weighted loss cannot be combined with data.class_selection")
 
     for key in ("mode", "project", "job_type"):
         _require(wandb[key], str, f"wandb.{key}")

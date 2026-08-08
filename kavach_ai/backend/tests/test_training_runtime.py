@@ -146,6 +146,55 @@ def test_build_trainer_constructs_without_training(monkeypatch, tmp_path) -> Non
     assert "train" not in captured
 
 
+def test_loss_resolution_uses_finalized_train_counts_in_label_order() -> None:
+    config = _config()
+    ordinary = runtime.resolve_loss_policy(config, {"Benign": 51_309, "Malicious": 7_661})
+    assert ordinary.type == "cross_entropy"
+    assert ordinary.class_weights is None
+
+    config["loss"] = {"type": "weighted_cross_entropy", "weighting": "balanced_from_train_counts"}
+    weighted = runtime.resolve_loss_policy(config, {"Benign": 51_309, "Malicious": 7_661})
+    assert weighted.label_order == ("Benign", "Malicious")
+    assert weighted.class_weights == pytest.approx((0.5746555185250151, 3.8487142670669625))
+    assert weighted.class_weights[1] > weighted.class_weights[0]
+    assert weighted.training_loss_weighted is True
+    assert weighted.evaluation_loss_weighted is False
+    with pytest.raises(ValueError, match="finalized TRAIN counts"):
+        runtime.resolve_loss_policy(config, {"Benign": 11_654, "Malicious": 1_411, "Test": 1})
+
+
+def test_weighted_trainer_weights_training_only_and_returns_outputs() -> None:
+    class FixedModel(torch.nn.Module):
+        def forward(self, input_ids=None):
+            return {"logits": input_ids}
+
+    model = FixedModel()
+    trainer = object.__new__(runtime.ClassWeightedTrainer)
+    trainer.class_weights = (0.5, 3.0)
+    logits = torch.tensor([[2.0, -1.0], [1.5, -0.5], [0.0, 1.0]])
+    labels = torch.tensor([0, 1, 1])
+    inputs = {"input_ids": logits, "labels": labels}
+
+    model.train()
+    train_loss, outputs = trainer.compute_loss(model, inputs, return_outputs=True)
+    expected_weighted = torch.nn.CrossEntropyLoss(weight=torch.tensor([0.5, 3.0]))(logits, labels)
+    assert train_loss == expected_weighted
+    assert outputs["logits"] is logits
+
+    model.eval()
+    eval_loss, eval_outputs = trainer.compute_loss(model, inputs, return_outputs=True)
+    expected_unweighted = torch.nn.CrossEntropyLoss()(logits, labels)
+    assert eval_loss == expected_unweighted
+    assert eval_loss != expected_weighted
+    assert eval_outputs["logits"] is logits
+    assert "labels" in inputs
+
+
+def test_metrics_are_independent_of_loss_policy() -> None:
+    prediction = (np.array([[2.0, 1.0], [0.0, 3.0], [4.0, 0.0]]), np.array([0, 1, 1]))
+    assert binary_classification_metrics(prediction) == binary_classification_metrics(prediction)
+
+
 def test_peft_named_trainer_evaluation_receives_predictions_and_labels(monkeypatch, tmp_path) -> None:
     received = {}
     original = runtime.binary_classification_metrics

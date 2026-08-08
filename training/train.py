@@ -20,7 +20,8 @@ from training.pipeline.data import (  # noqa: E402
     Corpus, PreflightResult, ScanSummary, TinyDataset, TokenShardIterableDataset,
     apply_context_policy, create_collator, load_corpus, load_local_tokenizer,
     load_validated_shard, preflight_split, prepare_record, scan_split,
-    select_smoke_records, select_tiny_records, validate_tokenizer,
+    class_selection_provenance, selected_ids_for_epoch, select_smoke_records,
+    select_tiny_records, validate_tokenizer,
 )
 from training.pipeline.model import (  # noqa: E402
     attach_lora, load_local_model_and_tokenizer, resolve_lora_targets,
@@ -34,7 +35,8 @@ from training.pipeline.provenance import (  # noqa: E402
     write_json_atomic,
 )
 from training.pipeline.trainer import (  # noqa: E402
-    build_trainer, effective_batch_size, resolve_hardware, run_training,
+    build_trainer, effective_batch_size, resolve_hardware, resolve_loss_policy,
+    run_training,
 )
 from training.utils.dataset import split_mapping_digest  # noqa: E402
 
@@ -102,8 +104,23 @@ def run_pipeline(config_path: Path, config: ResolvedConfig) -> None:
         train_dataset = TokenShardIterableDataset(
             corpus, config, config["data"]["train_split"], train_preflight,
         )
-        summary = train_preflight.summary
-        selected = list(train_preflight.records)
+        selected_ids = selected_ids_for_epoch(
+            train_preflight, config, config["data"]["train_split"], 0,
+        )
+        selected = [item for item in train_preflight.records if item["example_id"] in selected_ids]
+        if len(selected_ids) == train_preflight.summary.count:
+            summary = train_preflight.summary
+        else:
+            summary = ScanSummary(
+                len(selected), dict(Counter(item["label_name"] for item in selected)),
+                dict(Counter(item["sink_category"] for item in selected)),
+                len({item["apk_hash"] for item in selected}),
+                sum(item["internal_truncated"] for item in selected),
+                sum(item["context_truncated"] for item in selected),
+                train_preflight.summary.stored_records,
+                train_preflight.summary.rejected_records,
+                train_preflight.summary.rejection_counts,
+            )
         eval_dataset = None
         if mode == "train":
             evaluation = preflight_split(corpus, config, config["data"]["eval_split"])
@@ -112,6 +129,11 @@ def run_pipeline(config_path: Path, config: ResolvedConfig) -> None:
             )
 
     manifest = _base_manifest(config, corpus, summary)
+    selection_details = class_selection_provenance(
+        train_preflight, config, config["data"]["train_split"],
+    )
+    if selection_details is not None:
+        manifest["class_selection"] = selection_details
     if mode == "dry_run":
         tokenizer = load_local_tokenizer(corpus, config)
         batch = _batch(train_dataset, create_collator(tokenizer, config),
@@ -147,6 +169,9 @@ def run_pipeline(config_path: Path, config: ResolvedConfig) -> None:
         raise ValueError(f"Expected [batch, 2] logits, got {tuple(logits.shape)}")
 
     versions = package_versions()
+    loss_resolution = resolve_loss_policy(config, summary.class_counts)
+    loss_details = loss_resolution.serializable()
+    manifest["loss"] = loss_details
     aggregate = {
         "config_sha256": config_hash(config), "summary": summary.__dict__,
         "dataset_version": corpus.manifest["dataset_version"],
@@ -155,16 +180,18 @@ def run_pipeline(config_path: Path, config: ResolvedConfig) -> None:
         "sampler": config["data"]["sampler"], "lora": config["lora"],
         "lora_match_count": len(targets), "parameters": parameters.serializable(),
         "hardware": hardware.__dict__, "package_versions": versions,
+        "loss": loss_details,
     }
     trainer = build_trainer(
         config, model, train_dataset, eval_dataset, collator, tokenizer,
         output_dir=output.directory, selected_records_hash=_selected_hash(selected),
-        aggregate_counts=aggregate,
+        aggregate_counts=aggregate, loss_resolution=loss_resolution,
     )
     manifest.update({
         "hardware": hardware.__dict__, "package_versions": versions,
         "effective_batch_size": effective_batch_size(config),
         "lora_match_count": len(targets), "trainable_parameters": parameters.serializable(),
+        "loss": loss_details,
         "model": {"identifier": base_identifier, "model_type": base_model.config.model_type,
                   "num_hidden_layers": base_model.config.num_hidden_layers,
                   "max_position_embeddings": base_model.config.max_position_embeddings},
@@ -176,6 +203,7 @@ def run_pipeline(config_path: Path, config: ResolvedConfig) -> None:
         lora_targets={"matched_modules": list(targets), "settings": config["lora"]},
         trainable_parameters={**parameters.serializable(),
                               "names": [name for name, value in model.named_parameters() if value.requires_grad]},
+        loss_policy=loss_details,
     )
 
     def transition(status: str, details: dict[str, Any]) -> None:
@@ -199,7 +227,7 @@ def run_pipeline(config_path: Path, config: ResolvedConfig) -> None:
                                            "git_commit": git_commit()},
             lora_targets={"matched_modules": list(targets), "settings": config["lora"]},
             trainable_parameters=parameters.serializable(), adapter_metadata=adapter,
-            metrics=result.metrics,
+            metrics=result.metrics, loss_policy=loss_details,
         )
 
     _log_summary(summary)
