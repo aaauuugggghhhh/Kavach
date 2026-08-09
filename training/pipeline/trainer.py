@@ -257,7 +257,7 @@ def build_training_arguments(config: Mapping[str, Any], output_dir: str | Path |
     resolved = resolve_hardware(config)
     kwargs = dict(
         output_dir=str(output_dir if output_dir is not None else run["output_dir"]),
-        overwrite_output_dir=run["overwrite_output_dir"], seed=trainer["seed"], data_seed=trainer["data_seed"],
+        seed=trainer["seed"], data_seed=trainer["data_seed"],
         per_device_train_batch_size=trainer["per_device_train_batch_size"],
         per_device_eval_batch_size=trainer["per_device_eval_batch_size"],
         gradient_accumulation_steps=trainer["gradient_accumulation_steps"],
