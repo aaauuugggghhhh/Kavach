@@ -1,35 +1,653 @@
 import React, { useState } from 'react';
 import { useDetonation } from '@/context/DetonationContext';
+import { Play, Settings, Code2, Eye, Code, Download, RefreshCw, X, FileJson } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+
+interface PermissionDetail {
+  status: 'normal' | 'dangerous' | 'signature';
+  info: string;
+  description: string;
+}
+
+const ANDROID_PERMISSIONS_DB: Record<string, PermissionDetail> = {
+  'android.permission.INTERNET': {
+    status: 'normal',
+    info: 'full network access',
+    description: 'Allows the application to create network sockets and use custom network protocols.'
+  },
+  'android.permission.ACCESS_NETWORK_STATE': {
+    status: 'normal',
+    info: 'view network connections',
+    description: 'Allows the application to view information about network connections such as which networks exist and are connected.'
+  },
+  'android.permission.ACCESS_WIFI_STATE': {
+    status: 'normal',
+    info: 'view Wi-Fi connections',
+    description: 'Allows the application to view information about Wi-Fi networking, such as whether Wi-Fi is enabled and the name of connected Wi-Fi devices.'
+  },
+  'android.permission.CHANGE_WIFI_STATE': {
+    status: 'normal',
+    info: 'connect and disconnect Wi-Fi',
+    description: 'Allows the application to connect to and disconnect from Wi-Fi access points and to make changes to device configuration for Wi-Fi networks.'
+  },
+  'android.permission.CHANGE_NETWORK_STATE': {
+    status: 'normal',
+    info: 'change network connectivity',
+    description: 'Allows the application to change the state of network connectivity.'
+  },
+  'android.permission.BLUETOOTH': {
+    status: 'normal',
+    info: 'pair with Bluetooth devices',
+    description: 'Allows the application to view the configuration of the local Bluetooth radio, and to make and accept connections with paired devices.'
+  },
+  'android.permission.BLUETOOTH_ADMIN': {
+    status: 'normal',
+    info: 'Bluetooth administration',
+    description: 'Allows the application to configure the local Bluetooth radio, and to discover and pair with remote devices.'
+  },
+  'android.permission.READ_PHONE_STATE': {
+    status: 'dangerous',
+    info: 'read phone status and identity',
+    description: 'Allows the application to access the phone features of the device. This permission allows the application to determine the phone number and device IDs, whether a call is active, and the remote number connected by a call.'
+  },
+  'android.permission.READ_CONTACTS': {
+    status: 'dangerous',
+    info: 'read your contacts',
+    description: 'Allows the application to read data about your contacts stored on your device, including the frequency with which you have called, emailed, or communicated in other ways with specific individuals.'
+  },
+  'android.permission.WRITE_CONTACTS': {
+    status: 'dangerous',
+    info: 'modify your contacts',
+    description: 'Allows the application to modify the data about your contacts stored on your device, including the frequency with which you have called, emailed, or communicated in other ways with specific contacts.'
+  },
+  'android.permission.READ_SMS': {
+    status: 'dangerous',
+    info: 'read your text messages (SMS or MMS)',
+    description: 'Allows the application to read SMS messages stored on your device or SIM card. This allows the application to read all SMS messages, regardless of content or confidentiality.'
+  },
+  'android.permission.RECEIVE_SMS': {
+    status: 'dangerous',
+    info: 'receive text messages (SMS)',
+    description: 'Allows the application to receive and process SMS messages. This means the app could monitor or delete messages sent to your device without showing them to you.'
+  },
+  'android.permission.SEND_SMS': {
+    status: 'dangerous',
+    info: 'send and view SMS messages',
+    description: 'Allows the application to send SMS messages. This may result in unexpected charges. Malicious applications may cost you money by sending messages without your confirmation.'
+  },
+  'android.permission.RECEIVE_MMS': {
+    status: 'dangerous',
+    info: 'receive text messages (MMS)',
+    description: 'Allows the application to receive and process MMS messages. This means the app could monitor or delete messages sent to your device without showing them to you.'
+  },
+  'android.permission.ACCESS_FINE_LOCATION': {
+    status: 'dangerous',
+    info: 'precise location (GPS and network-based)',
+    description: 'Allows the application to get your precise location using the Global Positioning System (GPS) or network location sources such as cell towers and Wi-Fi.'
+  },
+  'android.permission.ACCESS_COARSE_LOCATION': {
+    status: 'dangerous',
+    info: 'approximate location (network-based)',
+    description: 'Allows the application to get your approximate location. This location is derived by location services using network location sources such as cell towers and Wi-Fi.'
+  },
+  'android.permission.CAMERA': {
+    status: 'dangerous',
+    info: 'take pictures and videos',
+    description: 'Allows the application to take pictures and videos with the camera. This permission allows the application to use the camera at any time without your confirmation.'
+  },
+  'android.permission.RECORD_AUDIO': {
+    status: 'dangerous',
+    info: 'record audio',
+    description: 'Allows the application to record audio using the microphone. This permission allows the application to record audio at any time without your confirmation.'
+  },
+  'android.permission.READ_EXTERNAL_STORAGE': {
+    status: 'dangerous',
+    info: 'read the contents of your shared storage',
+    description: 'Allows the application to read the contents of your shared storage, such as photos, videos, and documents.'
+  },
+  'android.permission.WRITE_EXTERNAL_STORAGE': {
+    status: 'dangerous',
+    info: 'modify or delete the contents of your shared storage',
+    description: 'Allows the application to write to the shared storage. This allows the app to modify or delete photos, videos, and documents.'
+  },
+  'android.permission.RECEIVE_BOOT_COMPLETED': {
+    status: 'normal',
+    info: 'run at startup',
+    description: 'Allows the application to start itself as soon as the system has finished booting. This can make the device take longer to start and allow the app to run background services continuously.'
+  },
+  'android.permission.WAKE_LOCK': {
+    status: 'normal',
+    info: 'prevent device from sleeping',
+    description: 'Allows the application to prevent the device from going to sleep.'
+  },
+  'android.permission.VIBRATE': {
+    status: 'normal',
+    info: 'control vibration',
+    description: 'Allows the application to control the vibrator.'
+  },
+  'android.permission.GET_TASKS': {
+    status: 'normal',
+    info: 'retrieve running apps',
+    description: 'Allows the application to retrieve information about current and recently running tasks. This may allow the app to discover private information about which applications you use.'
+  },
+  'android.permission.REORDER_TASKS': {
+    status: 'normal',
+    info: 'reorder running apps',
+    description: 'Allows the application to move tasks to the foreground and background. The app may do this without your input.'
+  },
+  'android.permission.SYSTEM_ALERT_WINDOW': {
+    status: 'dangerous',
+    info: 'draw over other apps',
+    description: 'Allows the application to show windows on top of other applications. Malicious apps can use this to hijack user interactions (clickjacking / phishing overlay).'
+  },
+  'android.permission.REQUEST_INSTALL_PACKAGES': {
+    status: 'signature',
+    info: 'request install packages',
+    description: 'Allows the application to request installing packages. Used by downloader malware to silently prompt or install secondary payloads.'
+  },
+  'android.permission.INSTALL_PACKAGES': {
+    status: 'signature',
+    info: 'install apps directly',
+    description: 'Allows an application to install new or updated Android packages without user interaction.'
+  },
+  'android.permission.BIND_ACCESSIBILITY_SERVICE': {
+    status: 'signature',
+    info: 'bind to accessibility service',
+    description: 'Must be required by an AccessibilityService, to ensure that only the system can bind to it. Used by advanced banking trojans to perform screen scraping and keylogging.'
+  },
+  'android.permission.POST_NOTIFICATIONS': {
+    status: 'normal',
+    info: 'post notifications',
+    description: 'Allows the application to post notifications to the user\'s status bar.'
+  },
+  'android.permission.USE_BIOMETRIC': {
+    status: 'normal',
+    info: 'use biometric hardware',
+    description: 'Allows the application to use biometric modalities (fingerprint, face, etc.) for authentication.'
+  },
+  'android.permission.USE_FINGERPRINT': {
+    status: 'normal',
+    info: 'use fingerprint hardware',
+    description: 'Allows the application to use fingerprint hardware for authentication (deprecated in favor of USE_BIOMETRIC).'
+  },
+  'android.permission.FOREGROUND_SERVICE': {
+    status: 'normal',
+    info: 'run foreground service',
+    description: 'Allows the app to use foreground services (persistent background tasks visible to the user).'
+  },
+  'android.permission.ACCESS_BACKGROUND_LOCATION': {
+    status: 'dangerous',
+    info: 'access location in the background',
+    description: 'Allows the application to access location in the background. Requires explicit user permission in newer Android versions.'
+  },
+  'android.permission.QUERY_ALL_PACKAGES': {
+    status: 'normal',
+    info: 'query all installed packages',
+    description: 'Allows the application to query the full list of installed applications on the device.'
+  }
+};
+
+interface CodeAnalysisIssue {
+  no: number;
+  issue: string;
+  severity: 'warning' | 'info' | 'high' | 'secure';
+  standards: Array<{ name: string; value: string }>;
+  files: string;
+}
+
+const DEFAULT_CODE_ANALYSIS_ISSUES: CodeAnalysisIssue[] = [
+  {
+    no: 1,
+    issue: 'IP Address disclosure',
+    severity: 'warning',
+    standards: [
+      { name: 'CWE', value: 'CWE-200: Information Exposure' },
+      { name: 'OWASP MASVS', value: 'MSTG-CODE-2' }
+    ],
+    files: 'Show Files'
+  },
+  {
+    no: 2,
+    issue: 'Files may contain hardcoded sensitive information like usernames, passwords, keys etc.',
+    severity: 'warning',
+    standards: [
+      { name: 'CWE', value: 'CWE-312: Cleartext Storage of Sensitive Information' },
+      { name: 'OWASP Top 10', value: 'M9: Reverse Engineering' },
+      { name: 'OWASP MASVS', value: 'MSTG-STORAGE-14' }
+    ],
+    files: 'Show Files'
+  },
+  {
+    no: 3,
+    issue: 'The App logs information. Sensitive information should never be logged.',
+    severity: 'info',
+    standards: [
+      { name: 'CWE', value: 'CWE-532: Insertion of Sensitive Information into Log File' },
+      { name: 'OWASP MASVS', value: 'MSTG-STORAGE-3' }
+    ],
+    files: 'Show Files'
+  },
+  {
+    no: 4,
+    issue: 'The App uses an insecure Random Number Generator.',
+    severity: 'warning',
+    standards: [
+      { name: 'CWE', value: 'CWE-330: Use of Insufficiently Random Values' },
+      { name: 'OWASP Top 10', value: 'M5: Insufficient Cryptography' }
+    ],
+    files: 'Show Files'
+  }
+];
+
+interface BehaviorRule {
+  id: string;
+  behaviour: string;
+  labels: string[];
+  files: string[];
+}
+
+const DEFAULT_BEHAVIOR_RULES: BehaviorRule[] = [
+  {
+    id: '00012',
+    behaviour: 'Read data and put it into a buffer stream',
+    labels: ['file'],
+    files: ['org/teleal/common/io/IO.java']
+  },
+  {
+    id: '00013',
+    behaviour: 'Read file and put it into a stream',
+    labels: ['file'],
+    files: ['okio/Okio.java', 'org/teleal/common/io/IO.java', 'org/teleal/common/xml/DOMParser.java']
+  },
+  {
+    id: '00022',
+    behaviour: 'Open a file from given absolute path of the file',
+    labels: ['file'],
+    files: ['org/teleal/common/jdoc/EasyDoclet.java', 'org/teleal/common/mock/http/MockServletContext.java']
+  },
+  {
+    id: '00036',
+    behaviour: 'Get resource file from res/raw directory',
+    labels: ['reflection'],
+    files: ['com/pure/iris/domain/logging/FileLoggingTree.java']
+  },
+  {
+    id: '00039',
+    behaviour: 'Start a web server',
+    labels: ['control', 'network'],
+    files: ['org/teleal/cling/transport/impl/apache/StreamServerImpl.java']
+  }
+];
 
 export const StaticView: React.FC = () => {
-  const { telemetry, simulationMode } = useDetonation();
-  const [activeTab, setActiveTab] = useState<'code_analysis' | 'behavior_analysis' | 'application_permissions' | 'abused_permissions'>('code_analysis');
+  const { staticResults, telemetry, viewDashboard, simulationMode, currentFile, runStaticScan } = useDetonation();
+  const [activeTab, setActiveTab] = useState<'code_analysis' | 'behavior_analysis' | 'application_permissions' | 'abused_permissions' | 'manifest_analysis'>('code_analysis');
+  const [viewingFile, setViewingFile] = useState<{ title: string, type: 'xml' | 'java' | 'smali', content: string | null, loading: boolean } | null>(null);
+  const [manifestSearch, setManifestSearch] = useState('');
+  const [codeSearch, setCodeSearch] = useState('');
+  const [behaviorSearch, setBehaviorSearch] = useState('');
+  const [permissionsSearch, setPermissionsSearch] = useState('');
 
-  const libs = telemetry?.native_libraries || [];
+  const apkHash = staticResults?.apk_details?.hash;
+
+  const handleRescan = () => {
+    if (currentFile) {
+      runStaticScan(currentFile);
+    } else {
+      alert("No active file session to rescan. Please upload an APK again.");
+    }
+  };
+
+  const openViewer = async (title: string, type: 'xml' | 'java' | 'smali', endpoint_type: string) => {
+    if (!apkHash) {
+      alert("No APK hash available for this scan.");
+      return;
+    }
+    setViewingFile({ title, type, content: null, loading: true });
+    try {
+      const res = await fetch(`/artifacts/${apkHash}/${endpoint_type}`);
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const text = await res.text();
+      setViewingFile({ title, type, content: text, loading: false });
+    } catch (err: any) {
+      setViewingFile({ title, type, content: `Error fetching source: ${err.message}`, loading: false });
+    }
+  };
+
+  const handleDownload = (endpoint_type: string) => {
+    if (!apkHash) {
+      alert("No APK hash available for this scan.");
+      return;
+    }
+    window.open(`/artifacts/${apkHash}/${endpoint_type}?download=true`, '_blank');
+  };
+
+  const mlVerdict = staticResults?.ml_metrics?.verdict || 'WARNING';
+  const mlProb = staticResults?.ml_metrics?.malicious_probability ?? 0.89;
+  const modelId = staticResults?.ml_metrics?.model_id || 'securebert-full-weighted';
+  const permissionsList = staticResults?.triage?.permissions || [
+    'android.permission.ACCESS_NETWORK_STATE',
+    'android.permission.ACCESS_WIFI_STATE',
+    'android.permission.CHANGE_WIFI_MULTICAST_STATE',
+    'android.permission.INTERNET',
+    'android.permission.POST_NOTIFICATIONS'
+  ];
+  const abusedCombinations = staticResults?.triage?.permission_combinations || ['SMS_EXFILTRATION', 'BOOT_PERSISTENT_INSTALLER'];
+  const libs = staticResults?.native_libraries || telemetry?.native_libraries || [];
+
+  // ── Manifest Analysis ──
+  const activities = staticResults?.triage?.activities || [];
+  const services = staticResults?.triage?.services || [];
+  const receivers = staticResults?.triage?.receivers || [];
+  const providers = staticResults?.triage?.providers || [];
+  const allComponents = [...activities, ...services, ...receivers, ...providers];
+
+  const manifestIssues: Array<{ issue: string, severity: 'high' | 'medium' | 'low', description: string }> = [];
+
+  allComponents.forEach((comp: any) => {
+    if (comp.exported && !comp.permission) {
+      const typeLabel = comp.component_type ? comp.component_type.charAt(0).toUpperCase() + comp.component_type.slice(1) : 'Component';
+      manifestIssues.push({
+        issue: `${typeLabel} (${comp.name}) is not Protected. An intent-filter exists.`,
+        severity: 'high',
+        description: `An ${typeLabel} is found to be shared with other apps on the device therefore leaving it accessible to any other application on the device. The presence of intent-filter indicates that the ${typeLabel} is explicitly exported.`
+      });
+    }
+  });
+
+  const minSdk = staticResults?.triage?.min_sdk;
+  const targetSdk = staticResults?.triage?.target_sdk;
+  if (minSdk && minSdk < 21) {
+    manifestIssues.push({
+      issue: `Legacy Minimum SDK version (${minSdk}) specified.`,
+      severity: 'medium',
+      description: `The application supports Android versions older than Lollipop (API 21), which lacks modern sandboxing security models and leaves it open to legacy vulnerabilities.`
+    });
+  }
+  if (targetSdk && targetSdk < 31) {
+    manifestIssues.push({
+      issue: `Outdated Target SDK version (${targetSdk}) specified.`,
+      severity: 'medium',
+      description: `Targeting older APIs allows the application to bypass runtime permission checks and background execution restrictions introduced in newer Android versions.`
+    });
+  }
+
+  // Pre-populate mock manifest issues for simulation mode or default state
+  if (manifestIssues.length === 0 && (simulationMode || allComponents.length === 0)) {
+    const pkg = staticResults?.apk_details?.package || 'com.domobile.applock';
+    manifestIssues.push(
+      {
+        issue: `Activity (${pkg}.MediaReceiverActivity) is not Protected. An intent-filter exists.`,
+        severity: 'high',
+        description: 'An Activity is found to be shared with other apps on the device therefore leaving it accessible to any other application on the device. The presence of intent-filter indicates that the Activity is explicitly exported.'
+      },
+      {
+        issue: `Activity (${pkg}.ActiveProfileActivity) is not Protected. An intent-filter exists.`,
+        severity: 'high',
+        description: 'An Activity is found to be shared with other apps on the device therefore leaving it accessible to any other application on the device. The presence of intent-filter indicates that the Activity is explicitly exported.'
+      },
+      {
+        issue: `Activity (${pkg}.MainActivity) is not Protected. An intent-filter exists.`,
+        severity: 'high',
+        description: 'An Activity is found to be shared with other apps on the device therefore leaving it accessible to any other application on the device. The presence of intent-filter indicates that the Activity is explicitly exported.'
+      },
+      {
+        issue: `Activity (${pkg}.PluginVerifyActivity) is not Protected. An intent-filter exists.`,
+        severity: 'high',
+        description: 'An Activity is found to be shared with other apps on the device therefore leaving it accessible to any other application on the device. The presence of intent-filter indicates that the Activity is explicitly exported.'
+      },
+      {
+        issue: `Activity (${pkg}.SceneShortcutActivity) is not Protected. An intent-filter exists.`,
+        severity: 'high',
+        description: 'An Activity is found to be shared with other apps on the device therefore leaving it accessible to any other application on the device. The presence of intent-filter indicates that the Activity is explicitly exported.'
+      }
+    );
+  }
+
+  const filteredManifestIssues = manifestIssues.filter(issue => 
+    issue.issue.toLowerCase().includes(manifestSearch.toLowerCase()) || 
+    issue.description.toLowerCase().includes(manifestSearch.toLowerCase())
+  );
+
+  const filteredCodeIssues = DEFAULT_CODE_ANALYSIS_ISSUES.filter(issue => {
+    const searchLower = codeSearch.toLowerCase();
+    const issueMatch = issue.issue.toLowerCase().includes(searchLower);
+    const standardMatch = issue.standards.some(std => 
+      std.name.toLowerCase().includes(searchLower) || 
+      std.value.toLowerCase().includes(searchLower)
+    );
+    return issueMatch || standardMatch;
+  });
+
+  const filteredBehaviorRules = DEFAULT_BEHAVIOR_RULES.filter(rule => {
+    const searchLower = behaviorSearch.toLowerCase();
+    const idMatch = rule.id.toLowerCase().includes(searchLower);
+    const behaviourMatch = rule.behaviour.toLowerCase().includes(searchLower);
+    const labelMatch = rule.labels.some(l => l.toLowerCase().includes(searchLower));
+    const fileMatch = rule.files.some(f => f.toLowerCase().includes(searchLower));
+    return idMatch || behaviourMatch || labelMatch || fileMatch;
+  });
+
+  const filteredPermissions = permissionsList.filter(perm => {
+    const detail = ANDROID_PERMISSIONS_DB[perm];
+    const permString = perm.toLowerCase();
+    const infoString = detail ? detail.info.toLowerCase() : '';
+    const descString = detail ? detail.description.toLowerCase() : '';
+    const searchLower = permissionsSearch.toLowerCase();
+    return permString.includes(searchLower) || infoString.includes(searchLower) || descString.includes(searchLower);
+  });
+
+  // ── Static SHAP Feature Attribution ──
+  const shapData: { name: string; value: number }[] = [];
+  
+  // Mapping of raw permission to human-readable label and risk weight
+  const permissionWeights: Record<string, { label: string, value: number }> = {
+    'android.permission.INTERNET': { label: 'Internet Access', value: 0.10 },
+    'android.permission.ACCESS_NETWORK_STATE': { label: 'Network State', value: 0.05 },
+    'android.permission.ACCESS_WIFI_STATE': { label: 'WiFi State', value: 0.05 },
+    'android.permission.READ_CONTACTS': { label: 'Read Contacts', value: 0.25 },
+    'android.permission.READ_SMS': { label: 'Read SMS', value: 0.30 },
+    'android.permission.SEND_SMS': { label: 'Send SMS', value: 0.35 },
+    'android.permission.RECEIVE_SMS': { label: 'Receive SMS', value: 0.35 },
+    'android.permission.ACCESS_FINE_LOCATION': { label: 'Fine Location', value: 0.20 },
+    'android.permission.RECORD_AUDIO': { label: 'Record Audio', value: 0.25 },
+    'android.permission.CAMERA': { label: 'Camera Access', value: 0.20 },
+    'android.permission.READ_EXTERNAL_STORAGE': { label: 'Read Storage', value: 0.15 },
+    'android.permission.WRITE_EXTERNAL_STORAGE': { label: 'Write Storage', value: 0.15 },
+    'android.permission.BIND_ACCESSIBILITY_SERVICE': { label: 'Accessibility', value: 0.40 },
+    'android.permission.RECEIVE_BOOT_COMPLETED': { label: 'Boot Persistence', value: 0.20 },
+    'android.permission.REQUEST_INSTALL_PACKAGES': { label: 'Install Apps', value: 0.30 },
+    'android.permission.WAKE_LOCK': { label: 'Wake Lock', value: 0.10 },
+    'android.permission.POST_NOTIFICATIONS': { label: 'Post Notifications', value: 0.05 },
+  };
+
+  permissionsList.forEach(perm => {
+    if (permissionWeights[perm]) {
+      shapData.push({ 
+        name: permissionWeights[perm].label, 
+        value: permissionWeights[perm].value 
+      });
+    } else {
+      // Fallback for unknown permissions (usually benign)
+      const label = perm.split('.').pop()?.replace(/_/g, ' ') || perm;
+      shapData.push({ name: label, value: -0.05 });
+    }
+  });
+
+  const sortedShapData = [...shapData].sort((a, b) => Math.abs(a.value) - Math.abs(b.value));
+
+  // ── Static Behavioral Risk Matrix ──
+  let adware = 5;
+  let banking = 5;
+  let smsAbuse = 5;
+  let riskware = 5;
+  let spyware = 5;
+  let c2Control = 5;
+
+  permissionsList.forEach(perm => {
+    // Adware uses internet, network state, and alert overlays
+    if (perm.includes('INTERNET') || perm.includes('ACCESS_NETWORK_STATE')) adware += 10;
+    if (perm.includes('SYSTEM_ALERT_WINDOW')) adware += 35;
+
+    // Banking uses accessibility, phone status, and alert overlays
+    if (perm.includes('ACCESSIBILITY')) banking += 45;
+    if (perm.includes('READ_PHONE_STATE')) banking += 15;
+    if (perm.includes('SYSTEM_ALERT_WINDOW')) banking += 20;
+
+    // SMS abuse uses SMS permissions
+    if (perm.includes('SMS')) smsAbuse += 30;
+
+    // Riskware behavior includes package installs, package querying, and startup receivers
+    if (perm.includes('INSTALL_PACKAGES') || perm.includes('REQUEST_INSTALL_PACKAGES')) riskware += 35;
+    if (perm.includes('QUERY_ALL_PACKAGES')) riskware += 20;
+    if (perm.includes('RECEIVE_BOOT_COMPLETED')) riskware += 15;
+
+    // Spyware uses contacts, location, storage, camera, and recording
+    if (
+      perm.includes('CONTACTS') || 
+      perm.includes('LOCATION') || 
+      perm.includes('STORAGE') || 
+      perm.includes('CAMERA') || 
+      perm.includes('RECORD_AUDIO')
+    ) {
+      spyware += 20;
+    }
+
+    // Command & Control uses internet, network, and startup persistent checks
+    if (perm.includes('INTERNET') || perm.includes('NETWORK')) c2Control += 20;
+    if (perm.includes('RECEIVE_BOOT_COMPLETED')) c2Control += 15;
+  });
+
+  abusedCombinations.forEach(combo => {
+    if (combo === 'SMS_EXFILTRATION') {
+      spyware += 30;
+      smsAbuse += 40;
+      c2Control += 15;
+    }
+    if (combo === 'BOOT_PERSISTENT_INSTALLER') {
+      riskware += 45;
+      c2Control += 20;
+    }
+  });
+
+  const radarData = [
+    { subject: 'Adware Activity', value: Math.min(98, adware) },
+    { subject: 'Banking Fraud', value: Math.min(98, banking) },
+    { subject: 'SMS Abuse', value: Math.min(98, smsAbuse) },
+    { subject: 'Riskware Behavior', value: Math.min(98, riskware) },
+    { subject: 'Spyware & Data Theft', value: Math.min(98, spyware) },
+    { subject: 'Command & Control', value: Math.min(98, c2Control) },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Title & Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-foreground">Static & JNI Forensic Scan</h2>
-          <p className="text-xs text-muted-foreground mt-1">Abstract syntax tree vulnerabilities, permissions abuse, and JNI native scans.</p>
+          <h2 className="text-xl font-bold text-foreground">Static Analysis Scorecard</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Package: <span className="font-mono text-primary font-semibold">{staticResults?.apk_details?.package || 'com.example.app'}</span> | File: {staticResults?.apk_details?.name || 'app.apk'}
+          </p>
         </div>
-        {/* Compact Engine Status Badges */}
-        <div className="flex flex-wrap gap-2 text-[9px] font-mono font-bold bg-[#141416] border border-border px-2.5 py-1.5 rounded-none items-center text-muted-foreground uppercase tracking-wider shrink-0">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Manifest Scanned</span>
+        
+        {/* Status Badges */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden md:flex flex-wrap gap-2 text-[9px] font-mono font-bold bg-muted border border-border px-2.5 py-1.5 rounded-none items-center text-muted-foreground uppercase tracking-wider">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Manifest Scanned</span>
+            </div>
+            <span className="text-border">|</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Bytecode Decompiled</span>
+            </div>
+            <span className="text-border">|</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>SecureBERT Evaluated</span>
+            </div>
           </div>
-          <span className="text-border">|</span>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Bytecode Decompiled</span>
+        </div>
+      </div>
+
+      {/* Action & Decompiled Code Panels */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Scan Options */}
+        <div className="p-6 border border-border bg-card space-y-4 md:col-span-1 flex flex-col justify-between">
+          <div>
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-1">
+              <Settings className="w-3.5 h-3.5" /> Scan Options
+            </h3>
+            <p className="text-[11px] text-muted-foreground">Manage current analysis session</p>
           </div>
-          <span className="text-border">|</span>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Native Audited</span>
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={handleRescan}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold transition-all cursor-pointer shadow-sm w-full rounded-none"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Rescan
+            </button>
+            <button 
+              onClick={viewDashboard}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-500 text-xs font-bold transition-all cursor-pointer shadow-sm w-full rounded-none"
+            >
+              <Play className="w-3.5 h-3.5 fill-emerald-500" /> Start Dynamic Analysis
+            </button>
+          </div>
+        </div>
+
+        {/* Decompiled Code */}
+        <div className="p-6 border border-border bg-card space-y-4 md:col-span-2 flex flex-col justify-between">
+          <div>
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 mb-1">
+              <Code2 className="w-3.5 h-3.5" /> Decompiled Code & Extraction
+            </h3>
+            <p className="text-[11px] text-muted-foreground">Inspect and download raw decompiled sources</p>
+          </div>
+          <div className="flex flex-col gap-3 mt-4">
+            <div className="flex flex-wrap gap-2">
+              <button 
+                onClick={() => openViewer('AndroidManifest.xml', 'xml', 'manifest')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold transition-all cursor-pointer shadow-sm rounded-none"
+              >
+                <Eye className="w-3.5 h-3.5" /> View AndroidManifest.xml
+              </button>
+              <button 
+                onClick={() => openViewer('Decompiled Java Source', 'java', 'java')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold transition-all cursor-pointer shadow-sm rounded-none"
+              >
+                <Code className="w-3.5 h-3.5" /> View Java
+              </button>
+              <button 
+                onClick={() => openViewer('Dalvik Smali Bytecode', 'smali', 'smali')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold transition-all cursor-pointer shadow-sm rounded-none"
+              >
+                <Code className="w-3.5 h-3.5" /> View Smali
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button 
+                onClick={() => handleDownload('java')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-xs font-bold transition-all cursor-pointer shadow-sm rounded-none"
+              >
+                <Download className="w-3.5 h-3.5" /> Download Java Code
+              </button>
+              <button 
+                onClick={() => handleDownload('smali')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-xs font-bold transition-all cursor-pointer shadow-sm rounded-none"
+              >
+                <Download className="w-3.5 h-3.5" /> Download Smali Code
+              </button>
+              <button 
+                onClick={() => handleDownload('apk')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 text-xs font-bold transition-all cursor-pointer shadow-sm rounded-none"
+              >
+                <Download className="w-3.5 h-3.5" /> Download APK
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -39,14 +657,14 @@ export const StaticView: React.FC = () => {
         {/* Metric 1 */}
         <div className="p-6 space-y-4">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Static Verdict
+            SecureBERT AI Verdict
           </span>
           <div className="space-y-1">
-            <div className="text-2xl font-extrabold tracking-tight text-amber-500">
-              WARNING
+            <div className={`text-2xl font-extrabold tracking-tight ${mlVerdict === 'MALICIOUS' ? 'text-red-500' : 'text-emerald-500'}`}>
+              {mlVerdict}
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <span>Potential policy violations</span>
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
+              <span>Prob: {(mlProb * 100).toFixed(1)}%</span>
             </div>
           </div>
         </div>
@@ -54,15 +672,14 @@ export const StaticView: React.FC = () => {
         {/* Metric 2 */}
         <div className="p-6 space-y-4">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Vulnerabilities Flagged
+            Active Model Adapter
           </span>
           <div className="space-y-1">
-            <div className="text-2xl font-extrabold tracking-tight text-foreground">
-              4 Issues
+            <div className="text-sm font-bold tracking-tight text-foreground truncate max-w-[180px]">
+              {modelId}
             </div>
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <span className="text-amber-500 font-semibold">4 Warnings</span>
-              <span>• 1 Info</span>
+              <span>Loaded in PyTorch VRAM</span>
             </div>
           </div>
         </div>
@@ -70,15 +687,14 @@ export const StaticView: React.FC = () => {
         {/* Metric 3 */}
         <div className="p-6 space-y-4">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-            Malware Permissions
+            Permissions Flagged
           </span>
           <div className="space-y-1">
             <div className="text-2xl font-extrabold tracking-tight text-foreground">
-              4 / 25
+              {permissionsList.length} Extracted
             </div>
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <span className="text-red-500 font-semibold">High risk</span>
-              <span>system access</span>
+              <span className="text-red-500 font-semibold">{abusedCombinations.length} Dangerous combinations</span>
             </div>
           </div>
         </div>
@@ -90,21 +706,91 @@ export const StaticView: React.FC = () => {
           </span>
           <div className="space-y-1">
             <div className="text-2xl font-extrabold tracking-tight text-foreground">
-              {simulationMode ? 2 : libs.length} libs
+              {libs.length} libs
             </div>
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <span className="text-red-500 font-semibold">Unverified binary hooks</span>
+              <span className="text-amber-500 font-semibold">JNI Bridge Audited</span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* ═══ Row 2: Static SHAP & Radar ═══ */}
+      <div className="border-x border-b border-border rounded-none bg-card overflow-hidden grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border">
+        
+        {/* SHAP Feature Contribution */}
+        <div className="p-6 space-y-4">
+          <div>
+            <span className="text-sm font-bold text-foreground">Static Risk Attribution</span>
+            <p className="text-[11px] text-muted-foreground mt-1">Impact factors on static risk score derived from application permissions. <span className="text-[#b91c1c] font-semibold">Red</span> flags threat contribution; <span className="text-[#1d4ed8] font-semibold">Blue</span> denotes baseline safety.</p>
+          </div>
+          
+          <div className="h-[250px] w-full text-xs">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={sortedShapData}
+                layout="vertical"
+                margin={{ top: 10, right: 20, left: -20, bottom: 0 }}
+              >
+                <XAxis type="number" stroke="#52525b" fontSize={9} tickLine={false} />
+                <YAxis dataKey="name" type="category" stroke="#a1a1aa" fontSize={9} tickLine={false} width={120} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '0px' }}
+                  labelStyle={{ color: '#fafafa', fontWeight: 'bold' }}
+                />
+                <Bar dataKey="value" radius={0}>
+                  {sortedShapData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.value > 0 ? '#b91c1c' : '#1d4ed8'} 
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Behavioral Risk Matrix */}
+        <div className="p-6 space-y-4">
+          <div>
+            <span className="text-sm font-bold text-foreground">Static Risk Matrix</span>
+            <p className="text-[11px] text-muted-foreground mt-1">Normalized threat profile mapped statically via requested capabilities.</p>
+          </div>
+          
+          <div className="h-[250px] w-full text-xs flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                <PolarGrid stroke="#27272a" />
+                <PolarAngleAxis dataKey="subject" stroke="#a1a1aa" fontSize={9} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} stroke="#27272a" />
+                <Radar
+                  name="Risk Factor"
+                  dataKey="value"
+                  stroke="#b91c1c"
+                  fill="#b91c1c"
+                  fillOpacity={0.15}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       {/* Interactive Tabs Menu for Static Data */}
-      <div className="border-x border-b border-border bg-[#09090b] flex divide-x divide-border text-[10px] font-bold uppercase tracking-widest overflow-hidden rounded-none shrink-0">
+      <div className="border-x border-b border-border bg-background flex divide-x divide-border text-[10px] font-bold uppercase tracking-widest overflow-hidden rounded-none shrink-0">
+        <button
+          onClick={() => setActiveTab('manifest_analysis')}
+          className={`flex-1 py-3 px-4 transition-all text-center cursor-pointer ${
+            activeTab === 'manifest_analysis' ? 'bg-secondary text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          Manifest Analysis
+        </button>
         <button
           onClick={() => setActiveTab('application_permissions')}
           className={`flex-1 py-3 px-4 transition-all text-center cursor-pointer ${
-            activeTab === 'application_permissions' ? 'bg-[#18181c] text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-[#121215] hover:text-foreground'
+            activeTab === 'application_permissions' ? 'bg-secondary text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
           Application Permissions
@@ -112,7 +798,7 @@ export const StaticView: React.FC = () => {
         <button
           onClick={() => setActiveTab('code_analysis')}
           className={`flex-1 py-3 px-4 transition-all text-center cursor-pointer ${
-            activeTab === 'code_analysis' ? 'bg-[#18181c] text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-[#121215] hover:text-foreground'
+            activeTab === 'code_analysis' ? 'bg-secondary text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
           Code Analysis
@@ -120,7 +806,7 @@ export const StaticView: React.FC = () => {
         <button
           onClick={() => setActiveTab('behavior_analysis')}
           className={`flex-1 py-3 px-4 transition-all text-center cursor-pointer ${
-            activeTab === 'behavior_analysis' ? 'bg-[#18181c] text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-[#121215] hover:text-foreground'
+            activeTab === 'behavior_analysis' ? 'bg-secondary text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
           Behavior Analysis
@@ -128,7 +814,7 @@ export const StaticView: React.FC = () => {
         <button
           onClick={() => setActiveTab('abused_permissions')}
           className={`flex-1 py-3 px-4 transition-all text-center cursor-pointer ${
-            activeTab === 'abused_permissions' ? 'bg-[#18181c] text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-[#121215] hover:text-foreground'
+            activeTab === 'abused_permissions' ? 'bg-secondary text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
           Abused Permissions
@@ -154,9 +840,10 @@ export const StaticView: React.FC = () => {
                   <span className="text-[10px] text-muted-foreground font-semibold">Search:</span>
                   <input 
                     type="text" 
-                    disabled
+                    value={codeSearch}
+                    onChange={(e) => setCodeSearch(e.target.value)}
                     placeholder="Search issues..."
-                    className="border border-border bg-[#0e0e11] text-foreground text-xs px-2 py-0.5 rounded-none outline-none w-32 cursor-not-allowed"
+                    className="border border-border bg-card text-foreground text-xs px-2 py-0.5 rounded-none outline-none w-32 focus:border-primary font-mono"
                   />
                 </div>
               </div>
@@ -170,126 +857,71 @@ export const StaticView: React.FC = () => {
                 <span className="text-muted-foreground font-bold">SUPPRESSED: <span className="text-zinc-500">0</span></span>
               </div>
 
-              {/* Code Analysis Table Mockup */}
+              {/* Code Analysis Table */}
               <div className="overflow-x-auto pt-2">
                 <table className="w-full text-left text-xs leading-normal">
                   <thead>
                     <tr className="text-muted-foreground border-b border-border">
                       <th className="pb-3 font-medium w-8">No</th>
                       <th className="pb-3 font-medium">Issue</th>
-                      <th className="pb-3 font-medium">Severity</th>
+                      <th className="pb-3 font-medium w-24">Severity</th>
                       <th className="pb-3 font-medium">Standards</th>
                       <th className="pb-3 font-medium">Files</th>
                       <th className="pb-3 font-medium text-right">Options</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">1</td>
-                      <td className="py-3 text-foreground font-semibold text-[11px]">IP Address disclosure</td>
-                      <td className="py-3">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-none">
-                          warning
-                        </span>
-                      </td>
-                      <td className="py-3 text-muted-foreground text-[10px] space-y-1">
-                        <div className="font-semibold text-foreground">CWE: <span className="font-mono text-muted-foreground">CWE-200: Information Exposure</span></div>
-                        <div className="font-semibold text-foreground">OWASP MASVS: <span className="font-mono text-muted-foreground">MSTG-CODE-2</span></div>
-                      </td>
-                      <td className="py-3">
-                        <button className="px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[9px] font-semibold tracking-wider hover:bg-blue-500/25 transition-all rounded-none cursor-pointer">
-                          Show Files
-                        </button>
-                      </td>
-                      <td className="py-3 text-right">
-                        <button className="px-1.5 py-0.5 border border-border bg-[#0e0e11] text-muted-foreground hover:text-foreground text-[10px] rounded-none cursor-pointer">
-                          👁️‍🗨️
-                        </button>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">2</td>
-                      <td className="py-3 text-foreground font-semibold text-[11px] max-w-[200px] leading-relaxed">
-                        Files may contain hardcoded sensitive information like usernames, passwords, keys etc.
-                      </td>
-                      <td className="py-3">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-none">
-                          warning
-                        </span>
-                      </td>
-                      <td className="py-3 text-muted-foreground text-[10px] space-y-1">
-                        <div className="font-semibold text-foreground">CWE: <span className="font-mono text-muted-foreground">CWE-312: Cleartext Storage of Sensitive Information</span></div>
-                        <div className="font-semibold text-foreground">OWASP Top 10: <span className="font-mono text-muted-foreground">M9: Reverse Engineering</span></div>
-                        <div className="font-semibold text-foreground">OWASP MASVS: <span className="font-mono text-muted-foreground">MSTG-STORAGE-14</span></div>
-                      </td>
-                      <td className="py-3">
-                        <button className="px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[9px] font-semibold tracking-wider hover:bg-blue-500/25 transition-all rounded-none cursor-pointer">
-                          Show Files
-                        </button>
-                      </td>
-                      <td className="py-3 text-right">
-                        <button className="px-1.5 py-0.5 border border-border bg-[#0e0e11] text-muted-foreground hover:text-foreground text-[10px] rounded-none cursor-pointer">
-                          👁️‍🗨️
-                        </button>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">3</td>
-                      <td className="py-3 text-foreground font-semibold text-[11px] leading-relaxed">
-                        The App logs information. Sensitive information should never be logged.
-                      </td>
-                      <td className="py-3">
-                        <span className="bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-none">
-                          info
-                        </span>
-                      </td>
-                      <td className="py-3 text-muted-foreground text-[10px] space-y-1">
-                        <div className="font-semibold text-foreground">CWE: <span className="font-mono text-muted-foreground">CWE-532: Insertion of Sensitive Information into Log File</span></div>
-                        <div className="font-semibold text-foreground">OWASP MASVS: <span className="font-mono text-muted-foreground">MSTG-STORAGE-3</span></div>
-                      </td>
-                      <td className="py-3">
-                        <button className="px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[9px] font-semibold tracking-wider hover:bg-blue-500/25 transition-all rounded-none cursor-pointer">
-                          Show Files
-                        </button>
-                      </td>
-                      <td className="py-3 text-right">
-                        <button className="px-1.5 py-0.5 border border-border bg-[#0e0e11] text-muted-foreground hover:text-foreground text-[10px] rounded-none cursor-pointer">
-                          👁️‍🗨️
-                        </button>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">4</td>
-                      <td className="py-3 text-foreground font-semibold text-[11px]">
-                        The App uses an insecure Random Number Generator.
-                      </td>
-                      <td className="py-3">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-none">
-                          warning
-                        </span>
-                      </td>
-                      <td className="py-3 text-muted-foreground text-[10px] space-y-1">
-                        <div className="font-semibold text-foreground">CWE: <span className="font-mono text-muted-foreground">CWE-330: Use of Insufficiently Random Values</span></div>
-                        <div className="font-semibold text-foreground">OWASP Top 10: <span className="font-mono text-muted-foreground">M5: Insufficient Cryptography</span></div>
-                      </td>
-                      <td className="py-3">
-                        <button className="px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[9px] font-semibold tracking-wider hover:bg-blue-500/25 transition-all rounded-none cursor-pointer">
-                          Show Files
-                        </button>
-                      </td>
-                      <td className="py-3 text-right">
-                        <button className="px-1.5 py-0.5 border border-border bg-[#0e0e11] text-muted-foreground hover:text-foreground text-[10px] rounded-none cursor-pointer">
-                          👁️‍🗨️
-                        </button>
-                      </td>
-                    </tr>
+                    {filteredCodeIssues.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-4 text-muted-foreground/60 italic text-center">
+                          No matching issues found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredCodeIssues.map((issue) => (
+                        <tr key={issue.no} className="hover:bg-accent/10 transition-colors">
+                          <td className="py-3 font-mono">{issue.no}</td>
+                          <td className="py-3 text-foreground font-semibold text-[11px] leading-relaxed max-w-xs">{issue.issue}</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-none border ${
+                              issue.severity === 'warning'
+                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                : issue.severity === 'info'
+                                  ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                                  : issue.severity === 'high'
+                                    ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                                    : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                            }`}>
+                              {issue.severity}
+                            </span>
+                          </td>
+                          <td className="py-3 text-muted-foreground text-[10px] space-y-1">
+                            {issue.standards.map((std, sidx) => (
+                              <div key={sidx} className="font-semibold text-foreground">
+                                {std.name}: <span className="font-mono text-muted-foreground">{std.value}</span>
+                              </div>
+                            ))}
+                          </td>
+                          <td className="py-3">
+                            <button className="px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[9px] font-semibold tracking-wider hover:bg-blue-500/25 transition-all rounded-none cursor-pointer">
+                              {issue.files}
+                            </button>
+                          </td>
+                          <td className="py-3 text-right">
+                            <button className="px-1.5 py-0.5 border border-border bg-card text-muted-foreground hover:text-foreground text-[10px] rounded-none cursor-pointer">
+                              👁️‍🗨️
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
 
               {/* Pagination footer */}
               <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-4 border-t border-border">
-                <span>Showing 1 to 4 of 4 entries</span>
+                <span>Showing {filteredCodeIssues.length} of {DEFAULT_CODE_ANALYSIS_ISSUES.length} entries</span>
                 <div className="flex gap-1">
                   <button className="px-2 py-1 bg-secondary text-foreground rounded-none border border-border cursor-pointer">Previous</button>
                   <button className="px-3 py-1 bg-primary text-primary-foreground rounded-none border border-primary font-bold">1</button>
@@ -313,9 +945,10 @@ export const StaticView: React.FC = () => {
                   <span className="text-[10px] text-muted-foreground font-semibold">Search:</span>
                   <input 
                     type="text" 
-                    disabled
+                    value={behaviorSearch}
+                    onChange={(e) => setBehaviorSearch(e.target.value)}
                     placeholder="Search behaviors..."
-                    className="border border-border bg-[#0e0e11] text-foreground text-xs px-2 py-0.5 rounded-none outline-none w-32 cursor-not-allowed"
+                    className="border border-border bg-card text-foreground text-xs px-2 py-0.5 rounded-none outline-none w-32 focus:border-primary font-mono"
                   />
                 </div>
               </div>
@@ -332,79 +965,39 @@ export const StaticView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">00012</td>
-                      <td className="py-3 text-foreground font-medium">Read data and put it into a buffer stream</td>
-                      <td className="py-3">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          file
-                        </span>
-                      </td>
-                      <td className="py-3 font-mono text-[9px] text-blue-400 hover:underline">
-                        org/teleal/common/io/IO.java
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">00013</td>
-                      <td className="py-3 text-foreground font-medium">Read file and put it into a stream</td>
-                      <td className="py-3">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          file
-                        </span>
-                      </td>
-                      <td className="py-3 font-mono text-[9px] text-blue-400 leading-normal space-y-0.5">
-                        <div className="hover:underline">okio/Okio.java</div>
-                        <div className="hover:underline">org/teleal/common/io/IO.java</div>
-                        <div className="hover:underline">org/teleal/common/xml/DOMParser.java</div>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">00022</td>
-                      <td className="py-3 text-foreground font-medium">Open a file from given absolute path of the file</td>
-                      <td className="py-3">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          file
-                        </span>
-                      </td>
-                      <td className="py-3 font-mono text-[9px] text-blue-400 leading-normal space-y-0.5">
-                        <div className="hover:underline">org/teleal/common/jdoc/EasyDoclet.java</div>
-                        <div className="hover:underline">org/teleal/common/mock/http/MockServletContext.java</div>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">00036</td>
-                      <td className="py-3 text-foreground font-medium">Get resource file from res/raw directory</td>
-                      <td className="py-3">
-                        <span className="bg-[#a21caf]/10 text-[#e879f9] border border-[#a21caf]/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          reflection
-                        </span>
-                      </td>
-                      <td className="py-3 font-mono text-[9px] text-blue-400 hover:underline">
-                        com/pure/iris/domain/logging/FileLoggingTree.java
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono">00039</td>
-                      <td className="py-3 text-foreground font-medium">Start a web server</td>
-                      <td className="py-3 flex flex-wrap gap-1">
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          control
-                        </span>
-                        <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          network
-                        </span>
-                      </td>
-                      <td className="py-3 font-mono text-[9px] text-blue-400 hover:underline">
-                        org/teleal/cling/transport/impl/apache/StreamServerImpl.java
-                      </td>
-                    </tr>
+                    {filteredBehaviorRules.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-muted-foreground/60 italic text-center">
+                          No matching behaviors found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredBehaviorRules.map((rule) => (
+                        <tr key={rule.id} className="hover:bg-accent/10 transition-colors">
+                          <td className="py-3 font-mono">{rule.id}</td>
+                          <td className="py-3 text-foreground font-medium">{rule.behaviour}</td>
+                          <td className="py-3 flex flex-wrap gap-1">
+                            {rule.labels.map((lbl, lidx) => (
+                              <span key={lidx} className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
+                                {lbl}
+                              </span>
+                            ))}
+                          </td>
+                          <td className="py-3 font-mono text-[9px] text-blue-400 leading-normal space-y-0.5">
+                            {rule.files.map((file, fidx) => (
+                              <div key={fidx} className="hover:underline cursor-pointer">{file}</div>
+                            ))}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
 
               {/* Pagination footer */}
               <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-4 border-t border-border">
-                <span>Showing 1 to 5 of 12 entries</span>
+                <span>Showing {filteredBehaviorRules.length} of {DEFAULT_BEHAVIOR_RULES.length} entries</span>
                 <div className="flex gap-1">
                   <button className="px-2 py-1 bg-secondary text-foreground rounded-none border border-border cursor-pointer">Previous</button>
                   <button className="px-3 py-1 bg-primary text-primary-foreground rounded-none border border-primary font-bold">1</button>
@@ -417,11 +1010,24 @@ export const StaticView: React.FC = () => {
 
           {activeTab === 'application_permissions' && (
             <>
-              <div>
-                <span className="text-sm font-bold text-foreground">Application Permissions</span>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Static manifest permissions extracted from AndroidManifest.xml.
-                </p>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                  <span className="text-sm font-bold text-foreground">Application Permissions ({permissionsList.length})</span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Static manifest permissions extracted from AndroidManifest.xml.
+                  </p>
+                </div>
+                {/* Search Bar */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground font-semibold">Search:</span>
+                  <input 
+                    type="text" 
+                    value={permissionsSearch}
+                    onChange={(e) => setPermissionsSearch(e.target.value)}
+                    placeholder="Search permissions..."
+                    className="border border-border bg-card text-foreground text-xs px-2 py-0.5 rounded-none outline-none w-32 focus:border-primary font-mono"
+                  />
+                </div>
               </div>
 
               {/* Permissions table */}
@@ -430,64 +1036,63 @@ export const StaticView: React.FC = () => {
                   <thead>
                     <tr className="text-muted-foreground border-b border-border">
                       <th className="pb-3 font-medium">Permission</th>
-                      <th className="pb-3 font-medium w-16">Status</th>
-                      <th className="pb-3 font-medium">Info</th>
+                      <th className="pb-3 font-medium w-24">Status</th>
+                      <th className="pb-3 font-medium w-48">Info</th>
                       <th className="pb-3 font-medium">Description</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono text-foreground font-semibold text-[10px]">android.permission.ACCESS_NETWORK_STATE</td>
-                      <td className="py-3">
-                        <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          normal
-                        </span>
-                      </td>
-                      <td className="py-3 text-foreground font-medium">view network status</td>
-                      <td className="py-3 text-muted-foreground text-[10px]">Allows an application to view the status of all networks.</td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono text-foreground font-semibold text-[10px]">android.permission.ACCESS_WIFI_STATE</td>
-                      <td className="py-3">
-                        <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          normal
-                        </span>
-                      </td>
-                      <td className="py-3 text-foreground font-medium">view Wi-Fi status</td>
-                      <td className="py-3 text-muted-foreground text-[10px]">Allows an application to view the information about the status of Wi-Fi.</td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono text-foreground font-semibold text-[10px]">android.permission.CHANGE_WIFI_MULTICAST_STATE</td>
-                      <td className="py-3">
-                        <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          normal
-                        </span>
-                      </td>
-                      <td className="py-3 text-foreground font-medium">allow Wi-Fi Multicast reception</td>
-                      <td className="py-3 text-muted-foreground text-[10px]">Allows an application to receive packets not directly addressed to your device.</td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono text-foreground font-semibold text-[10px]">android.permission.INTERNET</td>
-                      <td className="py-3">
-                        <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          normal
-                        </span>
-                      </td>
-                      <td className="py-3 text-foreground font-medium">full Internet access</td>
-                      <td className="py-3 text-muted-foreground text-[10px]">Allows an application to create network sockets.</td>
-                    </tr>
-                    <tr className="hover:bg-accent/10 transition-colors">
-                      <td className="py-3 font-mono text-foreground font-semibold text-[10px]">android.permission.POST_NOTIFICATIONS</td>
-                      <td className="py-3">
-                        <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none">
-                          dangerous
-                        </span>
-                      </td>
-                      <td className="py-3 text-foreground font-medium">allows an app to post notifications</td>
-                      <td className="py-3 text-muted-foreground text-[10px]">Allows an app to post notifications.</td>
-                    </tr>
+                    {filteredPermissions.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-muted-foreground/60 italic text-center">
+                          No matching permissions found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPermissions.map((perm, idx) => {
+                        const detail = ANDROID_PERMISSIONS_DB[perm] || (() => {
+                          const suffix = perm.split('.').pop() || perm;
+                          const info = suffix.replace(/_/g, ' ').toLowerCase();
+                          const isDangerous = perm.includes('SMS') || perm.includes('LOCATION') || perm.includes('CAMERA') || perm.includes('CONTACTS') || perm.includes('STORAGE') || perm.includes('INSTALL') || perm.includes('PHONE_STATE') || perm.includes('BLUETOOTH');
+                          return {
+                            status: isDangerous ? 'dangerous' as const : 'normal' as const,
+                            info,
+                            description: isDangerous ? 'High-risk capability access.' : 'Standard Android permission.'
+                          };
+                        })();
+
+                        const badgeColor = detail.status === 'dangerous' 
+                          ? 'bg-red-500/10 text-red-500 border-red-500/20' 
+                          : detail.status === 'signature' 
+                            ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                            : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+
+                        return (
+                          <tr key={idx} className="hover:bg-accent/10 transition-colors">
+                            <td className="py-3 font-mono text-foreground font-semibold text-[10px]">{perm}</td>
+                            <td className="py-3">
+                              <span className={`px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none border ${badgeColor}`}>
+                                {detail.status}
+                              </span>
+                            </td>
+                            <td className="py-3 text-muted-foreground text-[10px] font-semibold">{detail.info}</td>
+                            <td className="py-3 text-muted-foreground text-[10px]">{detail.description}</td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Pagination footer */}
+              <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-4 border-t border-border">
+                <span>Showing {filteredPermissions.length} of {permissionsList.length} entries</span>
+                <div className="flex gap-1">
+                  <button className="px-2 py-1 bg-secondary text-foreground rounded-none border border-border cursor-pointer">Previous</button>
+                  <button className="px-3 py-1 bg-primary text-primary-foreground rounded-none border border-primary font-bold">1</button>
+                  <button className="px-2 py-1 bg-secondary text-foreground rounded-none border border-border cursor-pointer">Next</button>
+                </div>
               </div>
             </>
           )}
@@ -495,39 +1100,24 @@ export const StaticView: React.FC = () => {
           {activeTab === 'abused_permissions' && (
             <>
               <div>
-                <span className="text-sm font-bold text-foreground">Abused Permissions</span>
+                <span className="text-sm font-bold text-foreground">Abused Permissions & Risk Vectors</span>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Static manifest permissions extracted and cross-referenced with standard malware signatures.
+                  Static manifest permissions cross-referenced with high-risk malware patterns.
                 </p>
               </div>
 
-              {/* Row: Abused Permissions (Progress bars) */}
+              {/* Row: Abused Permissions */}
               <div className="grid grid-cols-1 gap-4 p-4 bg-muted/20 border border-border rounded-none text-xs">
                 <div className="space-y-2">
                   <div className="flex justify-between font-bold text-foreground">
-                    <span>Top Malware Permissions</span>
-                    <span className="text-red-500">4/25</span>
+                    <span>Flagged Malware Combinations</span>
+                    <span className="text-red-500">{abusedCombinations.length} Detected</span>
                   </div>
-                  {/* Progress Bar Red */}
-                  <div className="w-full bg-[#18181c] h-2">
-                    <div className="bg-red-500 h-2" style={{ width: '16%' }}></div>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed font-mono">
-                    android.permission.ACCESS_NETWORK_STATE, android.permission.INTERNET, android.permission.ACCESS_WIFI_STATE, android.permission.WAKE_LOCK
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between font-bold text-foreground">
-                    <span>Other Common Permissions</span>
-                    <span className="text-amber-500">1/44</span>
-                  </div>
-                  {/* Progress Bar Yellow */}
-                  <div className="w-full bg-[#18181c] h-2">
-                    <div className="bg-amber-500 h-2" style={{ width: '2.2%' }}></div>
+                  <div className="w-full bg-secondary h-2">
+                    <div className="bg-red-500 h-2" style={{ width: `${Math.min(abusedCombinations.length * 33, 100)}%` }}></div>
                   </div>
                   <p className="text-[10px] text-muted-foreground leading-relaxed font-mono">
-                    com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE
+                    {abusedCombinations.length > 0 ? abusedCombinations.join(', ') : 'None detected'}
                   </p>
                 </div>
               </div>
@@ -587,8 +1177,117 @@ export const StaticView: React.FC = () => {
               </div>
             </>
           )}
+
+          {activeTab === 'manifest_analysis' && (
+            <>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                  <span className="text-sm font-bold text-foreground">Manifest Analysis</span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Structural security vulnerabilities and exposed entrypoints identified in AndroidManifest.xml.
+                  </p>
+                </div>
+                {/* Search Bar */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground font-semibold">Search:</span>
+                  <input 
+                    type="text" 
+                    value={manifestSearch}
+                    onChange={(e) => setManifestSearch(e.target.value)}
+                    placeholder="Search issues..."
+                    className="border border-border bg-card text-foreground text-xs px-2 py-0.5 rounded-none outline-none w-32 focus:border-primary font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Manifest Issues Table */}
+              <div className="overflow-x-auto pt-2">
+                <table className="w-full text-left text-xs leading-normal">
+                  <thead>
+                    <tr className="text-muted-foreground border-b border-border">
+                      <th className="pb-3 font-medium">Issue</th>
+                      <th className="pb-3 font-medium w-24">Severity</th>
+                      <th className="pb-3 font-medium">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {filteredManifestIssues.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="py-4 text-muted-foreground/60 italic text-center">
+                          No structural manifest vulnerabilities detected.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredManifestIssues.map((issue, idx) => (
+                        <tr key={idx} className="hover:bg-accent/10 transition-colors">
+                          <td className="py-3 font-semibold text-foreground text-[10px] pr-4 max-w-xs">{issue.issue}</td>
+                          <td className="py-3">
+                            <span className={`px-1.5 py-0.5 text-[8px] font-bold uppercase rounded-none border ${
+                              issue.severity === 'high'
+                                ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                                : issue.severity === 'medium'
+                                  ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                  : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                            }`}>
+                              {issue.severity}
+                            </span>
+                          </td>
+                          <td className="py-3 text-muted-foreground text-[10px] leading-relaxed">
+                            {issue.description}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      {/* File Viewer Modal */}
+      {viewingFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 md:p-12">
+          <div className="bg-card border border-border shadow-2xl w-full max-w-4xl h-full max-h-[80vh] flex flex-col rounded-none overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-border bg-card">
+              <div className="flex items-center gap-3">
+                <FileJson className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-bold text-foreground">{viewingFile.title}</h3>
+                  <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                    Read-only Inspection Mode
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setViewingFile(null)}
+                className="p-1.5 hover:bg-accent/10 border border-transparent hover:border-border text-muted-foreground hover:text-foreground transition-all cursor-pointer rounded-none"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {/* Modal Content - Code View */}
+            <div className="flex-1 overflow-auto p-4 bg-background">
+              {viewingFile.loading ? (
+                <div className="text-center text-muted-foreground py-20 flex flex-col items-center justify-center h-full">
+                  <RefreshCw className="w-12 h-12 text-muted-foreground/30 mb-4 animate-spin" />
+                  <p className="text-sm font-semibold">Extracting & Retrieving Source...</p>
+                  <p className="text-xs text-muted-foreground/70 max-w-sm mt-2">
+                    This may take a moment if the backend is actively decompiling {viewingFile.type.toUpperCase()}.
+                  </p>
+                </div>
+              ) : (
+                <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-all h-full">
+                  {viewingFile.content}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

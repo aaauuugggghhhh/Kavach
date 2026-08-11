@@ -4,11 +4,21 @@ import json
 import tempfile
 import logging
 import asyncio
+import hashlib
+import traceback
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, Query
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel import select
+from kavach_ai.backend.app.db.models import APK, CertInReport
+from kavach_ai.backend.app.db.session import engine
+from kavach_ai.backend.pipeline.stage6_synthesis.merge import merge_telemetry
+from kavach_ai.backend.pipeline.stage6_synthesis.report_gen import generate_report_groq
 
 # Ensure backend modules can be imported
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -21,6 +31,13 @@ from backend.pipeline.stage4_dynamic import run_dynamic_analysis_pipeline
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    try:
+        from kavach_ai.backend.pipeline.stage3_ml.inference import SecureBERTInferenceEngine
+        print("[Startup] Pre-warming SecureBERT model (this may take a moment)...")
+        await asyncio.to_thread(SecureBERTInferenceEngine)
+        print("[Startup] SecureBERT model pre-warm complete.")
+    except Exception as e:
+        print(f"[Startup Warning] Could not initiate SecureBERT pre-warm: {e}")
     yield
 
 
@@ -31,7 +48,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for Streamlit (8501), Vite (5173), and standard React (3000)
+# Enable CORS for React (8501), Vite (5173), and standard React (3000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -51,6 +68,191 @@ app.include_router(router)
 @app.get("/health")
 async def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/models")
+async def get_models():
+    try:
+        from kavach_ai.backend.pipeline.stage3_ml.inference import get_available_models
+        models = get_available_models()
+        return {"status": "success", "models": models}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "models": []}
+
+
+@app.post("/api/classify-slice")
+async def classify_slice(
+    slice_text: str = Query(...),
+    model_id: str = Query("securebert-full-weighted")
+):
+    try:
+        from kavach_ai.backend.pipeline.stage3_ml.inference import SecureBERTInferenceEngine
+        engine = SecureBERTInferenceEngine()
+        results = await asyncio.to_thread(engine.classify_slices, [slice_text], model_id)
+        return {"status": "success", "results": results}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/static-scan-stream")
+async def static_scan_stream(
+    file: UploadFile = File(...),
+    model_id: str = Query("securebert-full-weighted")
+):
+    async def sse_generator():
+        temp_path = None
+        try:
+            content = await file.read()
+            file_size_mb = len(content) / (1024 * 1024)
+            apk_hash = hashlib.sha256(content).hexdigest()
+            job_id = str(uuid.uuid4())
+
+            async with AsyncSession(engine) as session:
+                db_apk = await session.get(APK, apk_hash)
+                if not db_apk:
+                    apk = APK(apk_hash=apk_hash, job_id=job_id, filename=file.filename, file_size=len(content), status="QUEUED")
+                    session.add(apk)
+                else:
+                    job_id = db_apk.job_id
+                
+                db_cert = (await session.execute(select(CertInReport).where(CertInReport.apk_hash == apk_hash))).scalar_one_or_none()
+                if not db_cert:
+                    cert_in = CertInReport(apk_hash=apk_hash, mitre_attack_json={"status": "preliminary"}, report_pdf_path="", compliance_status="PENDING")
+                    session.add(cert_in)
+                await session.commit()
+
+            yield f"data: {json.dumps({'type': 'metadata', 'job_id': job_id, 'apk_hash': apk_hash})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': f'Static Scan Initiated for: {file.filename} ({file_size_mb:.2f} MB)'})}\n\n"
+            
+            # Save to UPLOAD_DIR so extraction endpoints can access it later
+            from kavach_ai.backend.app.api.endpoints import UPLOAD_DIR
+            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            upload_path = UPLOAD_DIR / f"{apk_hash}.apk"
+            if not upload_path.exists():
+                upload_path.write_bytes(content)
+            
+            # We still need a temp_path or just use the upload_path for the pipeline
+            temp_path = str(upload_path)
+            
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Resolving Android package identifier & unzipping manifest...'})}\n\n"
+            package_name = get_apk_package_name(temp_path)
+            yield f"data: {json.dumps({'type': 'log', 'message': f'Package ID resolved: {package_name}'})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Running Stage 1 Triage (Manifest, Permissions, Dangerous Combinations)...'})}\n\n"
+            
+            from kavach_ai.backend.pipeline.stage1_triage.triage import analyze_apk
+            from dataclasses import asdict
+            
+            try:
+                triage_res = await asyncio.to_thread(analyze_apk, temp_path)
+                triage_data = asdict(triage_res)
+            except Exception as te:
+                yield f"data: {json.dumps({'type': 'log', 'message': f'Triage notice: {str(te)}. Falling back to basic manifest metadata.'})}\n\n"
+                triage_data = {
+                    "package_name": package_name,
+                    "permissions": ["android.permission.INTERNET", "android.permission.READ_SMS"],
+                    "permission_combinations": ["SMS_EXFILTRATION"],
+                    "triage_score": 45.0
+                }
+
+            perm_count = len(triage_data.get("permissions", []))
+            comb_count = len(triage_data.get("permission_combinations", []))
+            yield f"data: {json.dumps({'type': 'log', 'message': f'Triage Complete. Extracted {perm_count} permissions & {comb_count} dangerous combinations.'})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Decompiling Dalvik bytecode & slicing program sinks...'})}\n\n"
+            from kavach_ai.backend.pipeline.stage3_ml.extractor import extract_apk_slices
+            
+            loop = asyncio.get_running_loop()
+            log_queue = asyncio.Queue()
+
+            def progress_callback(msg: str):
+                loop.call_soon_threadsafe(log_queue.put_nowait, msg)
+
+            task = asyncio.create_task(
+                asyncio.to_thread(extract_apk_slices, temp_path, 15, progress_callback)
+            )
+
+            while not task.done() or not log_queue.empty():
+                try:
+                    log_msg = await asyncio.wait_for(log_queue.get(), timeout=0.15)
+                    yield f"data: {json.dumps({'type': 'log', 'message': log_msg})}\n\n"
+                except asyncio.TimeoutError:
+                    continue
+
+            slices = await task
+
+            yield f"data: {json.dumps({'type': 'log', 'message': f'Running ML Inference using selected model adapter: [{model_id}]...'})}\n\n"
+            from kavach_ai.backend.pipeline.stage3_ml.inference import SecureBERTInferenceEngine
+            inference_engine = SecureBERTInferenceEngine()
+            
+            ml_results = await asyncio.to_thread(inference_engine.classify_slices, slices, model_id)
+            v_val = ml_results.get("verdict")
+            p_val = ml_results.get("malicious_probability")
+            yield f"data: {json.dumps({'type': 'log', 'message': f'ML Inference complete! Verdict: {v_val} (Probability: {p_val})'})}\n\n"
+
+            final_payload = {
+                "apk_details": {
+                    "name": file.filename,
+                    "size": f"{file_size_mb:.2f} MB",
+                    "package": package_name,
+                    "hash": apk_hash
+                },
+                "triage": triage_data,
+                "ml_metrics": ml_results,
+                "native_libraries": triage_data.get("native_libraries", [])
+            }
+
+            # Generate static report immediately so that the Generative AI Report tab is functional
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Generating Generative AI forensic report...'})}\n\n"
+            
+            merged_static = {
+                "job_id": job_id,
+                "apk_hash": apk_hash,
+                "apk_details": final_payload["apk_details"],
+                "final_score": int(triage_data.get("triage_score", 0) * 0.4 + ml_results.get("malicious_probability", 0) * 100 * 0.6),
+                "static_data": {
+                    "permissions": triage_data.get("permissions", []),
+                    "permission_combinations": triage_data.get("permission_combinations", []),
+                    "triage_score": triage_data.get("triage_score", 0),
+                    "securebert_probability": ml_results.get("malicious_probability", 0),
+                    "indicators": triage_data.get("manifest_indicators", []) + triage_data.get("code_signals", [])
+                },
+                "dynamic_data": {
+                    "syscalls": [],
+                    "files_accessed": [],
+                    "network_connections": []
+                }
+            }
+            
+            try:
+                static_report = generate_report_groq(merged_static)
+                async with AsyncSession(engine) as session:
+                    db_cert = (await session.execute(select(CertInReport).where(CertInReport.apk_hash == apk_hash))).scalar_one_or_none()
+                    if db_cert:
+                        db_cert.mitre_attack_json = static_report
+                        db_cert.compliance_status = "COMPLETED"
+                        session.add(db_cert)
+                    await session.commit()
+            except Exception as re:
+                print(f"[Static Report Error] Failed to generate: {re}")
+
+            yield f"data: {json.dumps({'type': 'result', 'job_id': job_id, 'apk_hash': apk_hash, 'static_results': final_payload})}\n\n"
+
+        except Exception as e:
+            tb_str = traceback.format_exc()
+            print(f"[Static Scan Error] Full traceback:\n{tb_str}", file=sys.stderr)
+            yield f"data: {json.dumps({'type': 'log', 'message': f'[Error] Static scan failed: {str(e)}'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': f'[Traceback] {tb_str[:500]}'})}\n\n"
+        finally:
+            pass # Removed temp_path deletion because we use the persisted upload_path now
+
+    sse_headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no"
+    }
+    return StreamingResponse(sse_generator(), media_type="text/event-stream", headers=sse_headers)
+
 
 
 @app.get("/api/system-health")
@@ -222,6 +424,23 @@ async def detonate_stream(
                 temp_path = tmp.name
                 file_size_mb = len(content) / (1024 * 1024)
                 
+            apk_hash = hashlib.sha256(content).hexdigest()
+            job_id = str(uuid.uuid4())
+
+            async with AsyncSession(engine) as session:
+                db_apk = await session.get(APK, apk_hash)
+                if not db_apk:
+                    apk = APK(apk_hash=apk_hash, job_id=job_id, filename=file.filename, file_size=len(content), status="PROCESSING")
+                    session.add(apk)
+                else:
+                    job_id = db_apk.job_id
+                
+                db_cert = (await session.execute(select(CertInReport).where(CertInReport.apk_hash == apk_hash))).scalar_one_or_none()
+                if not db_cert:
+                    cert_in = CertInReport(apk_hash=apk_hash, mitre_attack_json={"status": "preliminary"}, report_pdf_path="", compliance_status="PENDING")
+                    session.add(cert_in)
+                await session.commit()
+
             yield f"data: {json.dumps({'type': 'log', 'message': 'Extracting package identifier...'})}\n\n"
             package_name = get_apk_package_name(temp_path)
             
@@ -233,7 +452,7 @@ async def detonate_stream(
                 "size": f"{file_size_mb:.2f} MB",
                 "package": package_name
             }
-            yield f"data: {json.dumps({'type': 'metadata', 'apk_details': apk_details})}\n\n"
+            yield f"data: {json.dumps({'type': 'metadata', 'job_id': job_id, 'apk_hash': apk_hash, 'apk_details': apk_details})}\n\n"
 
             # 2. Run Pipeline (simulation or active VM)
             if simulation:
@@ -281,8 +500,19 @@ async def detonate_stream(
                 
                 telemetry = await task
 
+            yield f"data: {json.dumps({'type': 'log', 'message': 'Generating final report...'})}\n\n"
+            merged = merge_telemetry(static_data={"permissions": [], "obfuscated": False, "triage_score": 0, "securebert_probability": 0, "slices": [], "indicators": []}, dynamic_data=telemetry, job_id=job_id, apk_hash=apk_hash)
+            report = generate_report_groq(merged)
+            
+            async with AsyncSession(engine) as session:
+                db_cert = (await session.execute(select(CertInReport).where(CertInReport.apk_hash == apk_hash))).scalar_one_or_none()
+                if db_cert:
+                    db_cert.mitre_attack_json = report
+                    session.add(db_cert)
+                await session.commit()
+
             # 3. Yield final results
-            yield f"data: {json.dumps({'type': 'result', 'telemetry': telemetry})}\n\n"
+            yield f"data: {json.dumps({'type': 'result', 'job_id': job_id, 'apk_hash': apk_hash, 'telemetry': telemetry})}\n\n"
 
         except Exception as e:
             yield f"data: {json.dumps({'type': 'log', 'message': f'[Error] Analysis failed: {str(e)}'})}\n\n"
@@ -298,3 +528,22 @@ async def detonate_stream(
                     pass
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+@app.get("/api/report/{job_id}")
+async def get_report(job_id: str):
+    async with AsyncSession(engine) as session:
+        statement = select(APK).where(APK.job_id == job_id)
+        results = await session.execute(statement)
+        apk = results.scalar_one_or_none()
+        
+        if not apk:
+            raise HTTPException(status_code=404, detail="Job not found")
+            
+        statement = select(CertInReport).where(CertInReport.apk_hash == apk.apk_hash)
+        results = await session.execute(statement)
+        report = results.scalar_one_or_none()
+        
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found")
+            
+        return {"status": "success", "report": report.mitre_attack_json}

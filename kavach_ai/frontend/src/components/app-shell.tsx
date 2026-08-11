@@ -11,6 +11,7 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const { 
+    status, staticScanStatus,
     simulationMode, setSimulationMode, isAdbConnected, reset, 
     currentView, viewScorecard, viewDashboard, setCurrentView,
     detonationDuration, setDetonationDuration
@@ -36,6 +37,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             </span>
             <nav className="space-y-0.5">
               <button 
+                onClick={() => setCurrentView('static_scan')}
+                className={`w-full flex items-center gap-3 px-3 py-1.5 text-xs font-semibold transition-all text-left rounded-none cursor-pointer ${
+                  currentView === 'static_scan'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                }`}
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                Static Analysis
+              </button>
+              <button 
                 onClick={viewDashboard}
                 className={`w-full flex items-center gap-3 px-3 py-1.5 text-xs font-semibold transition-all text-left rounded-none cursor-pointer ${
                   currentView === 'dashboard'
@@ -45,17 +57,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
                 Dynamic Sandbox
-              </button>
-              <button 
-                onClick={() => setCurrentView('static_scan')}
-                className={`w-full flex items-center gap-3 px-3 py-1.5 text-xs font-semibold transition-all text-left rounded-none cursor-pointer ${
-                  currentView === 'static_scan'
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-                }`}
-              >
-                <FileCode className="w-3.5 h-3.5" />
-                Static & JNI Scan
               </button>
               <button 
                 onClick={() => setCurrentView('bert_classifier')}
@@ -89,7 +90,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 onClick={viewScorecard}
                 className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold transition-all text-left rounded-none cursor-pointer ${
                   currentView === 'scorecard'
-                    ? 'bg-amber-500/10 text-amber-500 border-l-2 border-amber-500'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
                 }`}
               >
@@ -97,7 +98,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
                   <Award className="w-3.5 h-3.5" />
                   Kavach Scorecard
                 </div>
-                <span className="text-[9px] font-extrabold bg-amber-500/20 text-amber-500 px-1.5 py-0.2 uppercase">
+                <span className="text-[8px] font-bold bg-primary/15 text-primary/80 px-1.5 py-px uppercase tracking-wider">
                   NEW
                 </span>
               </button>
@@ -111,6 +112,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               >
                 <FileText className="w-3.5 h-3.5" />
                 CERT-In Templates
+              </button>
+              <button 
+                onClick={() => setCurrentView('kavach_report')}
+                className={`w-full flex items-center gap-3 px-3 py-1.5 text-xs font-semibold transition-all text-left rounded-none cursor-pointer ${
+                  currentView === 'kavach_report'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Kavach AI Report
               </button>
               <button 
                 onClick={() => setCurrentView('sandbox_health')}
@@ -186,7 +198,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           </div>
 
           {/* Sandbox Status Controller */}
-          <div className="p-4 border-t border-border bg-[#0d0d10] space-y-3">
+          <div className="p-4 border-t border-border bg-card space-y-3">
             <div className="p-3 border border-border bg-card space-y-3 rounded-none">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase block">
                 Sandbox Status
@@ -254,7 +266,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           </div>
 
           {/* Reset Workspace button */}
-          {status !== 'landing' && (
+          {(status !== 'landing' || staticScanStatus !== 'landing') && (
             <button
               onClick={reset}
               className="flex items-center gap-2 px-3 py-1.5 border border-border hover:bg-accent text-xs font-semibold transition-all rounded-none"
