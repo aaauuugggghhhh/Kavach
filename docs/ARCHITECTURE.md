@@ -6,35 +6,42 @@ This document maps how the **Universal Project Blueprint** structures the AI/ML 
 
 ## Technical Overview: Aligned Architecture
 
-```
-[ OFFLINE TRAINING PART ]
-Multi-Source Corpora (AMD, Drebin, AndroZoo)
-       │
-       ▼
-Slice Extraction (LAMD Slicing)
-       │
-       ▼
-SecureBERT-2.0 Tokenizer
-       │
-       ▼
-Model Fine-Tuning (PyTorch + DDP + LoRA)
-       │
-       ▼
-Saved Weights & Adapters (backend/pipeline/stage3_ml/weights/) ──┐
-                                                         │ (Loaded at Startup)
-=========================================================│===================================================
-[ LIVE ACTUAL PART (RUN-TIME) ]                          │
-                                                         ▼
-Uploaded APK ──► Stage 1: Manifest Triage ──► Stage 4: SecureBERT Inference ──► Stage 5: SHAP Attribution
-                     (Lightweight AXML)            (Local model/adapter)             (Plotly Bar Chart)
-                            │                                                                │
-                            ▼                                                                ▼
-                 Stage 2: Local Dynamic Sandbox ─────────────────────► Stage 6: Telemetry Fusion & Merge
-                  (ADB + Frida + eBPF Sandbox)                         (Contradiction overrides)
-                                                                                     │
-                                                                                     ▼
-                                                                        Stage 7: LLaMA-3 Groq Compiler
-                                                                          (Forensic PDF & CERT-In Forms)
+```mermaid
+flowchart TD
+    subgraph Offline["[ OFFLINE TRAINING PART ]"]
+        direction TB
+        C["Multi-Source Corpora (AMD, Drebin, AndroZoo)"]
+        S["Slice Extraction (LAMD Slicing)"]
+        T["SecureBERT-2.0 Tokenizer"]
+        F["Model Fine-Tuning (PyTorch + DDP + LoRA)"]
+        W["Saved Weights & Adapters (backend/pipeline/stage3_ml/weights/)"]
+        
+        C --> S
+        S --> T
+        T --> F
+        F --> W
+    end
+
+    subgraph Live["[ LIVE ACTUAL PART (RUN-TIME) ]"]
+        direction TB
+        APK["Uploaded APK"]
+        S1["Stage 1: Manifest Triage<br/>(Lightweight AXML)"]
+        S2["Stage 2: Local Dynamic Sandbox<br/>(ADB + Frida + eBPF Sandbox)"]
+        S4["Stage 4: SecureBERT Inference<br/>(Local model/adapter)"]
+        S5["Stage 5: SHAP Attribution<br/>(Plotly Bar Chart)"]
+        S6["Stage 6: Telemetry Fusion & Merge<br/>(Contradiction overrides)"]
+        S7["Stage 7: LLaMA-3 Groq Compiler<br/>(Forensic PDF & CERT-In Forms)"]
+        
+        APK --> S1
+        S1 --> S4
+        S1 --> S2
+        S4 --> S5
+        S5 --> S6
+        S2 --> S6
+        S6 --> S7
+    end
+
+    W -.->|Loaded at Startup| S4
 ```
 
 ---
@@ -69,12 +76,12 @@ The training pipeline handles data ingestion, bytecode processing, tokenization,
 
 ## 2. The Actual Part (Runtime Inference Pipeline)
 
-The "Actual Part" is the live forensic engine wrapped by the Streamlit dashboard. It operates in under 30 seconds for the synchronous analysis path. It uses decoupled utilities located under `backend/pipeline/` and `backend/app/` to process inputs and produce outputs.
+The "Actual Part" is the live forensic engine wrapped by the React dashboard. It operates in under 30 seconds for the synchronous analysis path. It uses decoupled utilities located under `backend/pipeline/` and `backend/app/` to process inputs and produce outputs.
 
 ### B. The Decoupled Architecture (FastAPI & PostgreSQL)
 
 To avoid the **Monolithic Bottleneck** where the user interface freezes while waiting for heavy ML model calculations and dynamic sandbox execution, Kavach.ai employs a completely decoupled architecture:
-* **Streamlit Frontend:** Serves as a light presentation layer that takes user actions and displays forensic outputs.
+* **React Frontend:** Serves as a light presentation layer that takes user actions and displays forensic outputs.
 * **FastAPI Orchestrator:** Manages job dispatching and asynchronous background workers.
 * **PostgreSQL State Manager:** Relational database mapping process state and analysis results.
 
@@ -82,11 +89,11 @@ To avoid the **Monolithic Bottleneck** where the user interface freezes while wa
 When an APK is uploaded, the FastAPI backend does not block:
 1. **Ingest:** FastAPI accepts the uploaded file.
 2. **Vault:** Immediately vaults the physical binary file to the local PostgreSQL database (stashed as a secure BYTEA payload or in local offline storage).
-3. **Ticket Generation:** Records a transaction row in PostgreSQL, returning a unique `Job ID` (receipt ticket) instantly to the Streamlit client.
+3. **Ticket Generation:** Records a transaction row in PostgreSQL, returning a unique `Job ID` (receipt ticket) instantly to the React client.
 4. **Background Handoff:** Dispatches the file analysis tasks to background Celery or ARQ worker processes, freeing FastAPI to ingest concurrent requests.
 
 #### Client-Side Polling
-Rather than maintaining a persistent connection, the Streamlit client uses its `Job ID` to poll the FastAPI backend via a lightweight endpoint (`GET /jobs/{id}`) every 2 seconds:
+Rather than maintaining a persistent connection, the React client uses its `Job ID` to poll the FastAPI backend via a lightweight endpoint (`GET /jobs/{id}`) every 2 seconds:
 - If the database indicates **"Analyzing"**, the UI renders a loading animation.
 - If the database status transitions to **"Completed"**, the UI retrieves the normalized report metrics and halts polling.
 
@@ -179,10 +186,10 @@ This domain separation creates a cryptographically verifiable audit trail. Bank 
 | Blueprint Rule | Application in Kavach.ai |
 |:---|:---|
 | **Spec before code** | Standardized [docs/PRODUCT_SPEC.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/PRODUCT_SPEC.md) acts as our roadmap. |
-| **Backend before frontend** | All analytical capabilities (manifest parser, local dynamic sandbox orchestrator, classifier logic) are written as decoupled Python modules under `backend/pipeline/` and fully tested before the Streamlit layout is constructed. |
+| **Backend before frontend** | All analytical capabilities (manifest parser, local dynamic sandbox orchestrator, classifier logic) are written as decoupled Python modules under `backend/pipeline/` and fully tested before the React layout is constructed. |
 | **One source of truth** | [docs/PROJECT_HANDOFF.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/PROJECT_HANDOFF.md) is updated after every development session. |
 | **Free does not mean fragile** | Heavy deep learning models and paid API calls (Groq) are structured with robust, high-fidelity fallback simulators, ensuring the dashboard remains usable. |
-| **Polish is not optional** | Streamlit views utilize custom CSS elements (`frontend/assets/styles.css`) to display loading animations, styled tables, and interactive dashboards rather than raw JSON strings. |
+| **Polish is not optional** | React views utilize custom CSS elements (`frontend/assets/styles.css`) to display loading animations, styled tables, and interactive dashboards rather than raw JSON strings. |
 
 ---
 
@@ -196,9 +203,9 @@ kavach_ai/
 ├── infrastructure/             # DevOps & Local Environment
 │   ├── docker-compose.yml      # Spins up PostgreSQL & Redis containers natively
 │   ├── Dockerfile.api
-│   └── Dockerfile.streamlit
+│   └── Dockerfile.React
 │
-├── frontend/                   # Streamlit SOC Dashboard (React 19 on standby)
+├── frontend/                   # React SOC Dashboard (React 19 on standby)
 │   ├── app.py                  # Main entry point (drag-and-drop file upload)
 │   ├── assets/
 │   │   └── styles.css          # Custom styling

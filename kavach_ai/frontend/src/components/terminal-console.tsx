@@ -3,9 +3,11 @@ import { useDetonation } from '@/context/DetonationContext';
 import { Terminal } from 'lucide-react';
 
 export const TerminalConsole: React.FC = () => {
-  const { logs, apkDetails, detonationDuration } = useDetonation();
+  const { logs, apkDetails, detonationDuration, currentView, staticScanStatus } = useDetonation();
   const [timeLeft, setTimeLeft] = useState<number>(detonationDuration);
   const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  const isStaticMode = currentView === 'static_scan';
 
   // Sync initial duration on mount or selection change
   useEffect(() => {
@@ -36,7 +38,7 @@ export const TerminalConsole: React.FC = () => {
     return logs.some((log) => patterns.some((p) => log.toLowerCase().includes(p.toLowerCase())));
   };
 
-  const steps = [
+  const dynamicSteps = [
     { label: 'APK Parse & Load', time: '0.0s', active: checkEvent(['receiving', 'extracting', 'package']) },
     { label: 'Emulator Installation', time: '1.2s', active: checkEvent(['installing', 'device', 'emulator-']) },
     { label: 'Frida Server Spawn', time: '2.5s', active: checkEvent(['frida', 'hooks']) },
@@ -45,11 +47,22 @@ export const TerminalConsole: React.FC = () => {
     { label: 'Telemetry Logs Synced', time: `${detonationDuration.toFixed(1)}s`, active: checkEvent(['complete', 'syncing', 'telemetry']) },
   ];
 
+  const staticSteps = [
+    { label: 'APK Parse & Package ID', time: '0.0s', active: checkEvent(['initiated', 'resolving']) },
+    { label: 'Stage 1 Triage & Manifest', time: '0.8s', active: checkEvent(['triage', 'manifest']) },
+    { label: 'Dalvik Bytecode Decompilation', time: '3.2s', active: checkEvent(['decompiling', 'decompiled']) },
+    { label: 'Program Sinks Slicing', time: '5.5s', active: checkEvent(['sinks', 'slicing', 'slices']) },
+    { label: 'SecureBERT Neural Evaluation', time: '8.0s', active: checkEvent(['inference using', 'securebert model']) },
+    { label: 'Static Scorecard Generation', time: '10.5s', active: checkEvent(['inference complete', 'verdict:']) },
+  ];
+
+  const steps = isStaticMode ? staticSteps : dynamicSteps;
+
   return (
     <div className="space-y-6">
       {/* 1. Header Details KPI Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="border border-border rounded-lg p-4 bg-card">
+        <div className="border border-border rounded-none p-4 bg-card">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
             Target Artifact
           </span>
@@ -57,7 +70,7 @@ export const TerminalConsole: React.FC = () => {
             {apkDetails?.name || 'Loading...'}
           </span>
         </div>
-        <div className="border border-border rounded-lg p-4 bg-card">
+        <div className="border border-border rounded-none p-4 bg-card">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
             File Size
           </span>
@@ -65,7 +78,7 @@ export const TerminalConsole: React.FC = () => {
             {apkDetails?.size || 'Computing...'}
           </span>
         </div>
-        <div className="border border-border rounded-lg p-4 bg-card">
+        <div className="border border-border rounded-none p-4 bg-card">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
             Package Identifier
           </span>
@@ -73,24 +86,30 @@ export const TerminalConsole: React.FC = () => {
             {apkDetails?.package || 'Extracting...'}
           </span>
         </div>
-        <div className="border border-border rounded-lg p-4 bg-card">
+        <div className="border border-border rounded-none p-4 bg-card">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
             Analysis Status
           </span>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
             <span className="text-xs font-bold text-cyan-500 uppercase tracking-wide">
-              {timeLeft > 0 ? `DETONATING (${timeLeft}s)` : 'PROCESSING'}
+              {isStaticMode ? 'ANALYZING BYTECODE' : timeLeft > 0 ? `DETONATING (${timeLeft}s)` : 'PROCESSING'}
             </span>
           </div>
         </div>
       </div>
 
       {/* Dynamic Progress Bar */}
-      <div className="w-full h-1 bg-[#121217] overflow-hidden relative border border-border/40">
+      <div className="w-full h-1 bg-secondary overflow-hidden relative border border-border/40">
         <div 
           className="absolute top-0 left-0 h-full bg-cyan-500 transition-all duration-1000 ease-linear shadow-[0_0_8px_rgba(6,182,212,0.5)]"
-          style={{ width: `${((detonationDuration - timeLeft) / detonationDuration) * 100}%` }}
+          style={{ 
+            width: isStaticMode 
+              ? (staticScanStatus === 'completed' 
+                  ? '100%' 
+                  : `${Math.min(95, Math.max(10, Math.round((staticSteps.filter(s => s.active).length / staticSteps.length) * 100)))}%`)
+              : `${((detonationDuration - timeLeft) / detonationDuration) * 100}%` 
+          }}
         />
       </div>
 
@@ -98,13 +117,13 @@ export const TerminalConsole: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         
         {/* Log Terminal (Obsidian Glass style) */}
-        <div className="border border-border rounded-lg bg-[#070709] flex flex-col h-[350px]">
+        <div className="border border-border rounded-none bg-background flex flex-col h-[350px]">
           {/* Terminal Header */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-[#0d0d11]">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
             <div className="flex items-center gap-2">
               <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                Execution Logging Output
+                {isStaticMode ? 'Static Scan Execution Log' : 'Execution Logging Output'}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -115,16 +134,16 @@ export const TerminalConsole: React.FC = () => {
           </div>
           
           {/* Scrollable Log Output */}
-          <div className="flex-1 p-4 overflow-y-auto font-mono text-xs text-[#d1d5db] space-y-1.5 leading-relaxed selection:bg-primary/20">
+          <div className="flex-1 p-4 overflow-y-auto font-mono text-xs text-muted-foreground space-y-1.5 leading-relaxed selection:bg-primary/20">
             {logs.length === 0 ? (
               <div className="text-muted-foreground/45 italic">Waiting for analysis logs...</div>
             ) : (
               logs.map((log, idx) => {
-                let colorClass = 'text-[#d1d5db]';
+                let colorClass = 'text-muted-foreground';
                 if (log.toLowerCase().includes('[error]')) colorClass = 'text-red-400';
                 else if (log.toLowerCase().includes('[warn]')) colorClass = 'text-amber-400';
                 else if (log.toLowerCase().includes('[sim]') || log.toLowerCase().includes('[info]')) colorClass = 'text-blue-400';
-                else if (log.toLowerCase().includes('success')) colorClass = 'text-emerald-400';
+                else if (log.toLowerCase().includes('success') || log.toLowerCase().includes('complete')) colorClass = 'text-emerald-400';
                 
                 return (
                   <div key={idx} className={colorClass}>
@@ -139,10 +158,10 @@ export const TerminalConsole: React.FC = () => {
         </div>
 
         {/* Dynamic Timeline Checkpoints Tree */}
-        <div className="border border-border rounded-lg p-6 bg-card flex flex-col justify-between">
+        <div className="border border-border rounded-none p-6 bg-card flex flex-col justify-between">
           <div>
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-4">
-              Detonation Timeline
+              {isStaticMode ? 'Static Analysis Timeline' : 'Detonation Timeline'}
             </span>
 
             {/* Vertical connector progress line */}
@@ -171,7 +190,9 @@ export const TerminalConsole: React.FC = () => {
           </div>
 
           <div className="text-[10px] text-muted-foreground/50 leading-relaxed border-t border-border/60 pt-4 mt-6">
-            Observing bytecode behaviors in real-time. Do not abort session until telemetry sync finishes.
+            {isStaticMode
+              ? 'Decompiling Smali bytecode and evaluating neural threat vectors. Do not abort session.'
+              : 'Observing bytecode behaviors in real-time. Do not abort session until telemetry sync finishes.'}
           </div>
         </div>
 
@@ -179,4 +200,5 @@ export const TerminalConsole: React.FC = () => {
     </div>
   );
 };
+
 export default TerminalConsole;

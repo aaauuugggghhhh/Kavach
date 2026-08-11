@@ -11,7 +11,7 @@ def merge_telemetry(
     *,
     job_id: str | None = None,
     apk_hash: str | None = None,
-) -> MergedTelemetry:
+) -> dict:
     static = _coerce_static(static_data)
     dynamic = _coerce_dynamic(dynamic_data)
 
@@ -59,7 +59,7 @@ def merge_telemetry(
             "observed_runtime_dex_loading": dynamic.observed_runtime_dex_loading,
         },
         shap_evidence=shap_evidence,
-    )
+    ).dict()
 
 
 def _coerce_static(static_data: StaticAnalysisResult | dict) -> StaticAnalysisResult:

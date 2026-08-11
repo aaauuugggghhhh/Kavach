@@ -1,0 +1,168 @@
+_wandb:
+    value:
+        cli_version: 0.28.1
+        e:
+            uygfj0yl4dfuf05y38oxajb99spoon1z:
+                args:
+                    - --config
+                    - training\configs\train_full_weighted.yaml
+                codePath: training\train.py
+                codePathLocal: training\train.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                cudaVersion: "13.1"
+                disk:
+                    /:
+                        total: "865923493888"
+                        used: "497816567808"
+                email: galipallipranavraj@gmail.com
+                executable: C:\Users\Admin\Documents\Projects\Kavach\venv\scripts\python.exe
+                git:
+                    commit: dea83d9e1f3a8b32afc0b3750bedb7de65a64d2b
+                    remote: https://github.com/pranavrajgali/Kavach.git
+                gpu: NVIDIA GeForce RTX 4060 Laptop GPU
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 3072
+                      memoryTotal: "8585740288"
+                      name: NVIDIA GeForce RTX 4060 Laptop GPU
+                      uuid: GPU-b62474a5-aef4-834d-4c12-f876e687cb07
+                host: Raj-Omen-16
+                memory:
+                    total: "16415322112"
+                os: Windows-11-10.0.26200-SP0
+                program: C:\Users\Admin\Documents\Projects\Kavach\training\train.py
+                python: CPython 3.13.14
+                root: C:\Users\Admin\Documents\Projects\Kavach
+                startedAt: "2026-08-09T19:24:12.482200Z"
+                writerId: uygfj0yl4dfuf05y38oxajb99spoon1z
+        m: []
+        python_version: 3.13.14
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 49
+                - 53
+                - 71
+                - 98
+            "2":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 49
+                - 53
+                - 71
+                - 98
+            "3":
+                - 2
+                - 13
+                - 15
+                - 16
+                - 61
+            "4": 3.13.14
+            "5": 0.28.1
+            "6": 5.14.1
+            "8":
+                - 3
+            "12": 0.28.1
+            "13": windows-amd64
+aggregate_counts:
+    value:
+        config_sha256: 195945c9b95d994662fcda932ddfd54abc1fc02eeeaaa631163a6c374bb7aac3
+        dataset_version: dataset-v1
+        hardware:
+            bf16: false
+            cuda_available: true
+            dataloader_pin_memory: true
+            device: cuda
+            device_name: NVIDIA GeForce RTX 4060 Laptop GPU
+            fp16: false
+            mps_available: false
+            mps_built: false
+            precision: fp32
+        lora:
+            alpha: 16
+            bias: none
+            dropout: 0.05
+            enabled: true
+            modules_to_save:
+                - head
+                - classifier
+            rank: 8
+            target_modules:
+                - Wqkv
+            task_type: SEQ_CLS
+        lora_match_count: 22
+        loss:
+            class_weights:
+                - 0.5746555185250151
+                - 3.8487142670669625
+            evaluation_loss_weighted: false
+            label_order:
+                - Benign
+                - Malicious
+            label_to_weight:
+                Benign: 0.5746555185250151
+                Malicious: 3.8487142670669625
+            train_class_counts:
+                Benign: 51309
+                Malicious: 7661
+            training_loss_weighted: true
+            type: weighted_cross_entropy
+            weighting: balanced_from_train_counts
+        package_versions:
+            accelerate: 1.14.0
+            peft: 0.20.0
+            torch: 2.6.0+cu124
+            transformers: 5.14.1
+            wandb: 0.28.1
+        parameters:
+            classifier: 1538
+            head: 590592
+            lora: 540672
+            total: 150739204
+            trainable: 1132802
+            trainable_percent: 0.7514979314870205
+        sampler:
+            active_apk_shards: 8
+            type: apk_interleaved
+        split_digest: df30df0298933bc3d3c1cf3d3f3958a381e0ca7586693095dfdc4a080a2b741f
+        summary:
+            apk_count: 626
+            category_counts:
+                accessibility: 739
+                class_loader: 6818
+                execution: 399
+                native_loading: 734
+                reflection: 50149
+                sms: 131
+            class_counts:
+                Benign: 51309
+                Malicious: 7661
+            context_truncated: 5435
+            count: 58970
+            internal_truncated: 0
+            rejected_records: 9307
+            rejection_counts:
+                internally_truncated: 9307
+            stored_records: 68277
+        tokenizer_fingerprint: c8252c47907b5a3f4088ba8086ae5d3e16cc6826e2a319f81c42df5b81dceea1
+effective_batch_size:
+    value: 16
+learning_rate:
+    value: 0.0002
+max_context_length:
+    value: 1024
+mode:
+    value: train
+run_name:
+    value: securebert-full-weighted
+seed:
+    value: 42
+selected_records_sha256:
+    value: 2e6b6cd271a196edc021f64d9072b366d350099c7fc958359243ecc9613e7768

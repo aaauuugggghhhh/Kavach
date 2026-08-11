@@ -1,0 +1,44 @@
+{
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "CPython 3.13.14",
+  "startedAt": "2026-08-09T07:49:21.471721Z",
+  "args": [
+    "--config",
+    "training\\configs\\train_balanced_1to1.yaml"
+  ],
+  "program": "C:\\Users\\Admin\\Documents\\Projects\\Kavach\\training\\train.py",
+  "codePath": "training\\train.py",
+  "codePathLocal": "training\\train.py",
+  "git": {
+    "remote": "https://github.com/pranavrajgali/Kavach.git",
+    "commit": "dea83d9e1f3a8b32afc0b3750bedb7de65a64d2b"
+  },
+  "email": "galipallipranavraj@gmail.com",
+  "root": "C:\\Users\\Admin\\Documents\\Projects\\Kavach",
+  "host": "Raj-Omen-16",
+  "executable": "C:\\Users\\Admin\\Documents\\Projects\\Kavach\\venv\\scripts\\python.exe",
+  "cpu_count": 8,
+  "cpu_count_logical": 16,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "865923493888",
+      "used": "496445468672"
+    }
+  },
+  "memory": {
+    "total": "16415322112"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "memoryTotal": "8585740288",
+      "cudaCores": 3072,
+      "architecture": "Ada",
+      "uuid": "GPU-b62474a5-aef4-834d-4c12-f876e687cb07"
+    }
+  ],
+  "cudaVersion": "13.1",
+  "writerId": "8n0asn2m96xcvvrpyv37ge1c5eus792q"
+}

@@ -20,7 +20,7 @@
 ## 📋 Step-by-Step Task List
 
 ### 🌐 FastAPI Server (`kavach_ai/backend/app/...`)
-- [ ] **Main Entrypoint:** Configure the root `main.py` router with CORS settings allowing connection from Streamlit (Port 8501).
+- [ ] **Main Entrypoint:** Configure the root `main.py` router with CORS settings allowing connection from React (Port 8501).
 - [ ] **Restaurant Ticket Upload Endpoint (`/upload`):** Receive uploaded APK binary, save it temporarily, generate a unique `job_id`, write an entry to the DB with status `QUEUED`, enqueue a background worker job, and return the `job_id` instantly.
 - [ ] **Job Status Endpoint (`/status/{job_id}`):** Return pipeline execution states (`QUEUED`, `PROCESSING`, `COMPLETED`, `FAILED`).
 - [ ] **Report Endpoint (`/report/{job_id}`):** Fetch and return final CERT-In compliance JSON.

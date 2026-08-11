@@ -135,10 +135,10 @@ To achieve a sub-30-second operational target under real-world SOC workloads, Ka
 
 * **Synchronous Forensic Track (10–15 Seconds):** Runs manifest triage (~10 ms), Smali extraction and backward slicing (~5.0 s), SecureBERT-2.0 inference (~0.8 s on GPU / 2.5 s on CPU), SHAP token attribution (~1.5 s), and LLaMA-3 report generation via Groq API (~1.2 s). This yields a complete, auditable report and preliminary risk score in under 15 seconds.
 * **Asynchronous Dynamic Track (15–20 Seconds):** Runs in parallel. The orchestrator triggers native ADB detonation, injects root-bypass and SSL-pinning hooks via Frida (`frida_bypass.js`), and inserts the stealthy eBPF kernel probe. Telemetry is gathered for a 15-second observation window and returned immediately.
-* **Dynamic Dashboard Update:** Once the dynamic track finishes, the Streamlit dashboard updates the score and merges the user-land memory dumps and kernel-space logs into the active case file without requiring any manual analyst refresh.
+* **Dynamic Dashboard Update:** Once the dynamic track finishes, the React dashboard updates the score and merges the user-land memory dumps and kernel-space logs into the active case file without requiring any manual analyst refresh.
 
-#### Stage 7: Operational Deployment: Streamlit SOC Dashboard
-The entire multi-stage pipeline is exposed via a Python-native **Streamlit** dashboard, serving as the central operational hub for SOC analysts. Rather than interacting with abstract scripts, analysts use the dashboard for drag-and-drop binary uploads (APKs), real-time execution tracking, and interactive visualizations of the SHAP feature attributions. The interface renders the final LLaMA-3 case files dynamically, allowing for one-click PDF exports of the CERT-In compliance reports, shifting Kavach.ai from a backend engine into a fully deployable software asset.
+#### Stage 7: Operational Deployment: React SOC Dashboard
+The entire multi-stage pipeline is exposed via a Python-native **React** dashboard, serving as the central operational hub for SOC analysts. Rather than interacting with abstract scripts, analysts use the dashboard for drag-and-drop binary uploads (APKs), real-time execution tracking, and interactive visualizations of the SHAP feature attributions. The interface renders the final LLaMA-3 case files dynamically, allowing for one-click PDF exports of the CERT-In compliance reports, shifting Kavach.ai from a backend engine into a fully deployable software asset.
 
 ---
 
@@ -182,7 +182,7 @@ For **Kavach.ai (Problem Statement 1)**, the technology stack uses a lightweight
 
 | Pipeline Stage | Tools & Purpose |
 | :--- | :--- |
-| **Frontend & Orchestration** | **Streamlit** (SOC Analyst Dashboard with React 19 standby) and **FastAPI** microservices, managed with the **SQLModel** ORM database layer (with thread-safe connection pooling) and backed by **Celery or ARQ + Redis** for persistent background worker queues. |
+| **Frontend & Orchestration** | **React** (SOC Analyst Dashboard with React 19 standby) and **FastAPI** microservices, managed with the **SQLModel** ORM database layer (with thread-safe connection pooling) and backed by **Celery or ARQ + Redis** for persistent background worker queues. |
 | **Static Analysis** | **APKTool** (bytecode extraction), **JADX** (decompilation fallback), and **Androguard** (Control Flow / Data Flow Graph construction). |
 | **Dynamic Analysis** | **ADB Detonator, Frida Hooks, and eBPF** (local "Holy Trinity" dynamic sandbox orchestration for user-land bypasses and kernel-land telemetry collection). |
 | **Deep Learning Brain** | **PyTorch** runtime executing **SecureBERT-2.0** (our specialized encoder-only Transformer based on ModernBERT fine-tuned on code slices). |

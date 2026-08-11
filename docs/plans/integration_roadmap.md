@@ -30,7 +30,7 @@ graph TD
     P10 --> P12[12. End-to-End Pytest Verification]
     
     %% Phase 6
-    P12 --> P11[11. Streamlit Dashboard & UI Highlights]
+    P12 --> P11[11. React Dashboard & UI Highlights]
     P8 --> P11
 ```
 
@@ -73,8 +73,8 @@ graph TD
   * **[Siri / Track 4]** Implement API tests using pytest TestClient. Verify DB transaction rules and mock pipeline runs.
 * **LLM Tip:** *This stage validates the entire API capability. The web server must pass all tests before client dashboard bindings begin.*
 
-### 🎨 Phase 6: Streamlit Frontend & UI Integration (Days 12 - 14)
-* **Goal:** Bind the Streamlit UI to live endpoints, hook dynamic status polling, and enable interactive SHAP highlights.
+### 🎨 Phase 6: React Frontend & UI Integration (Days 12 - 14)
+* **Goal:** Bind the React UI to live endpoints, hook dynamic status polling, and enable interactive SHAP highlights.
 * **Core Tasks:**
-  * **[Galipalli / Track 1]** Hook Streamlit dashboard state machine to read status from FastAPI `/status/{job_id}`. Connect the SHAP highlighting panel.
-* **LLM Tip:** *This is the final integration phase. Run Streamlit only after pytest reports 100% pass on API routes.*
+  * **[Galipalli / Track 1]** Hook React dashboard state machine to read status from FastAPI `/status/{job_id}`. Connect the SHAP highlighting panel.
+* **LLM Tip:** *This is the final integration phase. Run React only after pytest reports 100% pass on API routes.*

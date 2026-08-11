@@ -11,17 +11,43 @@ import { CertInView } from '@/components/views/cert-in-view';
 import { SandboxHealthView } from '@/components/views/sandbox-health-view';
 import { SettingsView } from '@/components/views/settings-view';
 import { ApiCredentialsView } from '@/components/views/api-credentials-view';
+import { KavachReportView } from '@/components/views/kavach-report-view';
 import { AlertCircle } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-  const { status, currentView, reset, logs } = useDetonation();
+  const { status, staticScanStatus, currentView, reset, logs } = useDetonation();
 
   if (currentView === 'scorecard') {
     return <KavachScorecard />;
   }
 
   if (currentView === 'static_scan') {
-    return <StaticView />;
+    if (staticScanStatus === 'landing') {
+      return <UploadPanel mode="static" />;
+    }
+    if (staticScanStatus === 'analyzing') {
+      return <TerminalConsole />;
+    }
+    if (staticScanStatus === 'completed') {
+      return <StaticView />;
+    }
+    if (staticScanStatus === 'error') {
+      return (
+        <div className="flex flex-col items-center justify-center p-12 text-center border border-destructive/20 bg-destructive/5 rounded-lg max-w-2xl mx-auto my-12">
+          <AlertCircle className="w-12 h-12 text-destructive mb-4" />
+          <h3 className="text-lg font-bold text-foreground mb-2">Static Scan Encountered an Error</h3>
+          <p className="text-sm text-muted-foreground mb-6 max-h-60 overflow-y-auto font-mono text-left bg-black/40 p-4 rounded w-full">
+            {logs[logs.length - 1] || 'Static analysis failed.'}
+          </p>
+          <button
+            onClick={reset}
+            className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded text-sm transition-all cursor-pointer"
+          >
+            ← Scan Another APK
+          </button>
+        </div>
+      );
+    }
   }
 
   if (currentView === 'bert_classifier') {
@@ -46,6 +72,10 @@ export const Dashboard: React.FC = () => {
 
   if (currentView === 'api_credentials') {
     return <ApiCredentialsView />;
+  }
+
+  if (currentView === 'kavach_report') {
+    return <KavachReportView />;
   }
 
   switch (status) {

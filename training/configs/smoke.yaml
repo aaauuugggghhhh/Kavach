@@ -1,7 +1,7 @@
 schema_version: training-config-v2
 run: {mode: smoke, name: securebert-smoke, seed: 42, output_dir: training/outputs/securebert-smoke, overwrite_output_dir: false, resume_from_checkpoint: null}
 data:
-  root: training/data
+  root: training/data/data
   train_split: train
   eval_split: validation
   tokenizer_fingerprint: null

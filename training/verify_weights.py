@@ -5,7 +5,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from peft import PeftModel
 
-WEIGHTS_DIR = Path("kavach_ai/backend/pipeline/stage3_ml/weights")
+WEIGHTS_DIR = Path(__file__).parent.parent / "kavach_ai/backend/pipeline/stage3_ml/weights"
 BASE_MODEL_NAME = "cisco-ai/SecureBERT2.0-base"
 FALLBACK_MODEL_NAME = "Ehije/SecureBERT"
 

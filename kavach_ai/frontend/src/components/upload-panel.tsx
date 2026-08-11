@@ -1,9 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { useDetonation } from '@/context/DetonationContext';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, Cpu } from 'lucide-react';
 
-export const UploadPanel: React.FC = () => {
-  const { detonate } = useDetonation();
+interface UploadPanelProps {
+  mode?: 'dynamic' | 'static';
+}
+
+export const UploadPanel: React.FC<UploadPanelProps> = ({ mode = 'dynamic' }) => {
+  const { detonate, runStaticScan, availableModels, selectedModelId, setSelectedModelId } = useDetonation();
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -16,6 +20,14 @@ export const UploadPanel: React.FC = () => {
     setIsDragOver(false);
   };
 
+  const processFile = (file: File) => {
+    if (mode === 'static') {
+      runStaticScan(file, selectedModelId);
+    } else {
+      detonate(file);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -23,7 +35,7 @@ export const UploadPanel: React.FC = () => {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       if (file.name.endsWith('.apk')) {
-        detonate(file);
+        processFile(file);
       }
     }
   };
@@ -32,7 +44,7 @@ export const UploadPanel: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       if (file.name.endsWith('.apk')) {
-        detonate(file);
+        processFile(file);
       }
     }
   };
@@ -42,16 +54,42 @@ export const UploadPanel: React.FC = () => {
   };
 
   return (
-    <div className="max-w-xl mx-auto my-16 text-center space-y-8">
+    <div className="max-w-xl mx-auto my-12 text-center space-y-6">
       {/* Title Header */}
       <div>
         <h2 className="text-2xl font-bold text-foreground tracking-tight">
-          Dynamic Sandbox Detonator
+          {mode === 'static' ? 'Static & JNI Forensic Scanner' : 'Dynamic Sandbox Detonator'}
         </h2>
-        <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto leading-relaxed">
-          Upload an Android APK to analyze code behaviors, instrumentation logs, and kernel sockets in real time.
+        <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto leading-relaxed">
+          {mode === 'static'
+            ? 'Decompile Dalvik bytecode, extract manifest permissions, and evaluate neural program slices using SecureBERT.'
+            : 'Upload an Android APK to analyze code behaviors, instrumentation logs, and kernel sockets in real time.'}
         </p>
       </div>
+
+      {/* Model Selector for Static Mode */}
+      {mode === 'static' && (
+        <div className="p-4 border border-border bg-card/80 text-left space-y-2 rounded-none shadow-sm">
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Cpu className="w-3.5 h-3.5 text-primary" />
+            Select SecureBERT AI Model Adapter
+          </label>
+          <select
+            value={selectedModelId}
+            onChange={(e) => setSelectedModelId(e.target.value)}
+            className="w-full bg-background border border-border text-foreground text-xs p-2.5 outline-none font-mono focus:border-primary transition-all rounded-none cursor-pointer"
+          >
+            {availableModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-muted-foreground italic">
+            {availableModels.find((m) => m.id === selectedModelId)?.description || 'Select an active model adapter.'}
+          </p>
+        </div>
+      )}
 
       {/* Drag & Drop Card (Obsidian glass-morphism style) */}
       <div
@@ -94,3 +132,4 @@ export const UploadPanel: React.FC = () => {
   );
 };
 export default UploadPanel;
+

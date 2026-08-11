@@ -64,67 +64,6 @@ export const ReportView: React.FC = () => {
   const staticVerdictText = 'WARNING';
   const staticVerdictColor = 'text-amber-500';
 
-  // ── SHAP horizontal data ──
-  const shapData: { name: string; value: number }[] = [];
-  if (objectionRoot) shapData.push({ name: 'Frida Root Bypass', value: 0.35 });
-  if (objectionSsl) shapData.push({ name: 'Frida SSL Bypass', value: 0.30 });
-  filesAccessed.forEach(f => {
-    if (f.includes('app_process') || f.includes('system')) {
-      shapData.push({ name: 'Sys Binary Read', value: 0.25 });
-    } else if (f.includes('Bot')) {
-      shapData.push({ name: 'Bot Config I/O', value: 0.18 });
-    } else if (f.includes('shared_prefs') || f.includes('config')) {
-      shapData.push({ name: 'Config Write', value: 0.15 });
-    }
-  });
-  networkConns.forEach(c => {
-    if (c.port === 4444) {
-      shapData.push({ name: 'Rev Shell :4444', value: 0.45 });
-    } else {
-      shapData.push({ name: `Conn :${c.port}`, value: 0.10 });
-    }
-  });
-  if (simulationMode) {
-    shapData.push({ name: 'sys_clone syscall', value: -0.12 });
-    shapData.push({ name: 'DNS Port 53 query', value: -0.08 });
-  } else {
-    if (telemetry?.ebpf_telemetry?.syscalls?.includes('sys_clone')) {
-      shapData.push({ name: 'sys_clone syscall', value: -0.12 });
-    }
-    if (networkConns.some(c => c.port === 53)) {
-      shapData.push({ name: 'DNS Port 53 query', value: -0.08 });
-    }
-  }
-  const sortedShapData = [...shapData].sort((a, b) => Math.abs(a.value) - Math.abs(b.value));
-
-  // ── Behavioral Risk Matrix Radar ──
-  let dataTheft = simulationMode ? 15 : 5;
-  let finFraud = simulationMode ? 10 : 5;
-  let persistence = simulationMode ? 12 : 5;
-  let privEsc = simulationMode ? 15 : 5;
-  let evasion = simulationMode ? 10 : 5;
-  let c2Control = simulationMode ? 10 : 5;
-
-  if (objectionRoot) { evasion += 40; privEsc += 30; }
-  if (objectionSsl) { evasion += 45; c2Control += 25; }
-  filesAccessed.forEach(f => {
-    if (f.includes('shared_prefs') || f.includes('config')) { dataTheft += 30; persistence += 35; }
-    if (f.includes('app_process') || f.includes('system')) { privEsc += 45; evasion += 20; }
-    if (f.includes('Bot') || f.includes('contacts')) { dataTheft += 20; finFraud += 15; }
-  });
-  networkConns.forEach(c => {
-    if (c.port === 4444) { c2Control += 60; finFraud += 55; }
-    else { c2Control += 25; }
-  });
-
-  const radarData = [
-    { subject: 'Data Theft', value: Math.min(98, dataTheft) },
-    { subject: 'Financial Fraud', value: Math.min(98, finFraud) },
-    { subject: 'Persistence', value: Math.min(98, persistence) },
-    { subject: 'Privilege Escalation', value: Math.min(98, privEsc) },
-    { subject: 'Evasion', value: Math.min(98, evasion) },
-    { subject: 'Command & Control', value: Math.min(98, c2Control) },
-  ];
 
   const downloadTelemetry = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(telemetry, null, 2));
@@ -415,71 +354,9 @@ export const ReportView: React.FC = () => {
 
       </div>
 
-      {/* ═══ Row 3: SHAP Feature Attribution & Radar ═══ */}
-      <div className="border-x border-b border-border rounded-none bg-card overflow-hidden grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border">
-        
-        {/* SHAP Feature Contribution */}
-        <div className="p-6 space-y-4">
-          <div>
-            <span className="text-sm font-bold text-foreground">SHAP Feature Attribution</span>
-            <p className="text-[11px] text-muted-foreground mt-1">Impact factors on final risk score. <span className="text-[#b91c1c] font-semibold">Red</span> flags threat contribution; <span className="text-[#1d4ed8] font-semibold">Blue</span> denotes baseline safety.</p>
-          </div>
-          
-          <div className="h-[250px] w-full text-xs">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={sortedShapData}
-                layout="vertical"
-                margin={{ top: 10, right: 20, left: -20, bottom: 0 }}
-              >
-                <XAxis type="number" stroke="#52525b" fontSize={9} tickLine={false} />
-                <YAxis dataKey="name" type="category" stroke="#a1a1aa" fontSize={9} tickLine={false} width={120} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '0px' }}
-                  labelStyle={{ color: '#fafafa', fontWeight: 'bold' }}
-                />
-                <Bar dataKey="value" radius={0}>
-                  {sortedShapData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={entry.value > 0 ? '#b91c1c' : '#1d4ed8'} 
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Behavioral Risk Matrix */}
-        <div className="p-6 space-y-4">
-          <div>
-            <span className="text-sm font-bold text-foreground">Behavioral Risk Matrix</span>
-            <p className="text-[11px] text-muted-foreground mt-1">Normalized threat profile across key execution vectors.</p>
-          </div>
-          
-          <div className="h-[250px] w-full text-xs flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                <PolarGrid stroke="#27272a" />
-                <PolarAngleAxis dataKey="subject" stroke="#a1a1aa" fontSize={9} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} stroke="#27272a" />
-                <Radar
-                  name="Risk Factor"
-                  dataKey="value"
-                  stroke="#b91c1c"
-                  fill="#b91c1c"
-                  fillOpacity={0.15}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-      </div>
 
       {/* ═══ Evidence Tabs ═══ */}
-      <div className="border-x border-b border-border bg-[#09090b] flex divide-x divide-border text-[10px] font-bold uppercase tracking-widest overflow-hidden rounded-none">
+      <div className="border-x border-b border-border bg-background flex divide-x divide-border text-[10px] font-bold uppercase tracking-widest overflow-hidden rounded-none">
         {tabs.map(tab => {
           const Icon = tab.icon;
           return (
@@ -487,7 +364,7 @@ export const ReportView: React.FC = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 py-3 px-4 transition-all text-center cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5 ${
-                activeTab === tab.id ? 'bg-[#18181c] text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-[#121215] hover:text-foreground'
+                activeTab === tab.id ? 'bg-secondary text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               <Icon className="w-3 h-3" />

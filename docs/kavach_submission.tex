@@ -277,7 +277,7 @@ These trojans share three architectural properties that define the requirements 
 
     % Merge and Output Nodes
     \node (s6) [card] at (6.8, -3.2) {\textbf{Stage 6: Telemetry Merge}\\Contradiction Resolution\\\& BCNF Serialization};
-    \node (s7) [card, fill=white] at (6.8, -4.9) {\textbf{Stage 7: Streamlit SOC}\\Dashboard View, PDF Export\\\& LLaMA-3 Groq Report};
+    \node (s7) [card, fill=white] at (6.8, -4.9) {\textbf{Stage 7: React SOC}\\Dashboard View, PDF Export\\\& LLaMA-3 Groq Report};
 
     % Connections
     \draw [arrow] (apk) -- (s1);
@@ -403,7 +403,7 @@ setContentView()             -0.04   slightly pushed toward benign
 
 This attribution serves three functions in the pipeline. First, it provides the specific evidence excerpts that the merge layer passes to LLaMA-3, grounding the generative report in concrete code-level observations rather than model-level abstractions. Second, it creates an independently verifiable audit trail. A human analyst can look at the flagged tokens, examine the corresponding lines in the decompiled code, and confirm that the model's reasoning is grounded in real behavior. Third, it provides the feature-level explanation that satisfies regulatory requirements for auditable automated decision systems.
 
-Furthermore, to visualize these explanations interactively, the Streamlit dashboard features a custom **SHAP Highlight Renderer**. This interface physically renders the Smali bytecode on the screen: tokens that push the classification towards "Malicious" are illuminated with a red glow, while "Benign" tokens glow blue. This provides analysts with an intuitive, visual proof of the model's decision boundaries.
+Furthermore, to visualize these explanations interactively, the React dashboard features a custom **SHAP Highlight Renderer**. This interface physically renders the Smali bytecode on the screen: tokens that push the classification towards "Malicious" are illuminated with a red glow, while "Benign" tokens glow blue. This provides analysts with an intuitive, visual proof of the model's decision boundaries.
 
 The SHAP explainer is fitted once during the offline training phase on the validation partition and frozen before deployment. This ensures that attribution calculations during inference reflect the same model state that was evaluated during training.
 
@@ -430,7 +430,7 @@ Compares static and dynamic findings using explicit logical rules, assigning a c
 \paragraph{Layer 3: Output Schema Enforcement \& Graceful Degradation}
 Validates LLaMA-3 outputs against a Pydantic schema requiring structured MITRE ATT\&CK identifiers and direct token-level citations to SHAP or dynamic logs. For example, if the static analysis flags an Accessibility Service exploitation sink, the output schema enforces a mapping to \textbf{MITRE ATT\&CK Technique T1417 (Input Capture)} with direct code citations, grounding the threat label in concrete code behavior. The LLM acts purely as a structured compiler, preventing AI hallucinations.
 
-To prevent the Streamlit UI from throwing runtime exceptions if a chaotic malware string causes formatting slips or schema failures, the Groq parser incorporates a **Graceful Degradation** mechanism. The Pydantic validator is wrapped in try/except blocks; if strict validation fails, the engine falls back to a **Regex Recovery Parser** that extracts critical fields (such as threat classification, final score, and MITRE codes) from the raw LLM output, failing over to a clean pre-formatted markdown template so that the dashboard remains operational.
+To prevent the React UI from throwing runtime exceptions if a chaotic malware string causes formatting slips or schema failures, the Groq parser incorporates a **Graceful Degradation** mechanism. The Pydantic validator is wrapped in try/except blocks; if strict validation fails, the engine falls back to a **Regex Recovery Parser** that extracts critical fields (such as threat classification, final score, and MITRE codes) from the raw LLM output, failing over to a clean pre-formatted markdown template so that the dashboard remains operational.
 
 \needspace{10\baselineskip}
 \subsubsection*{Final Risk Score Calculation}
@@ -467,11 +467,11 @@ Contradiction overrides are applied to the final score as a post-processing step
 
 \subsubsection*{Decoupled Microservices, Latency Budget, and Asynchronous Orchestration}
 
-To avoid the monolithic bottleneck where heavy static calculations and dynamic sandboxing block the user interface, Kavach.ai separates execution into a decoupled microservices architecture utilizing a Streamlit frontend, a FastAPI asynchronous orchestrator, and a normalized PostgreSQL state manager.
+To avoid the monolithic bottleneck where heavy static calculations and dynamic sandboxing block the user interface, Kavach.ai separates execution into a decoupled microservices architecture utilizing a React frontend, a FastAPI asynchronous orchestrator, and a normalized PostgreSQL state manager.
 
-Under the FastAPI asynchronous model ("Restaurant Ticket" paradigm), the API accepts incoming APK binaries, vaults them in the local PostgreSQL database (stashed as secure BYTEA payloads or local secure offline storage), records an execution transaction in PostgreSQL, and immediately hands a unique \texttt{Job ID} ticket back to the Streamlit client. The heavy analysis is then routed to background Celery or ARQ worker processes, freeing the API to process concurrent requests.
+Under the FastAPI asynchronous model ("Restaurant Ticket" paradigm), the API accepts incoming APK binaries, vaults them in the local PostgreSQL database (stashed as secure BYTEA payloads or local secure offline storage), records an execution transaction in PostgreSQL, and immediately hands a unique \texttt{Job ID} ticket back to the React client. The heavy analysis is then routed to background Celery or ARQ worker processes, freeing the API to process concurrent requests.
 
-The Streamlit dashboard implements client-side polling, sending light requests to the FastAPI backend every two seconds using the \texttt{Job ID} ticket:
+The React dashboard implements client-side polling, sending light requests to the FastAPI backend every two seconds using the \texttt{Job ID} ticket:
 \begin{itemize}
   \item While the database status registers as \texttt{Analyzing}, the UI displays a loading spinner.
   \item When the database status updates to \texttt{Completed}, the UI retrieves the structured threat payload and renders the dashboard.
@@ -481,11 +481,11 @@ This asynchronous orchestration balances SOC concurrency requirements and fits a
 \begin{itemize}
   \item \textbf{Synchronous Forensic Track (10--15 Seconds):} Runs the triage filter (~10\,ms), Smali extraction and backward slicing (~5.0\,s), SecureBERT-2.0 inference (~0.8\,s), SHAP token attribution (~1.5\,s), and LLaMA-3 report compilation via Groq API (~1.2\,s). This yields a complete, auditable report and preliminary risk score in under 15 seconds.
   \item \textbf{Asynchronous Dynamic Track (15--20 Seconds):} Runs in parallel. The orchestrator triggers native ADB detonation, injects root-bypass and SSL-pinning hooks via Frida (\texttt{frida\_bypass.js}), and inserts the stealthy eBPF kernel probe. Telemetry is gathered for a 15-second observation window and returned immediately.
-  \item \textbf{Dynamic Dashboard Update:} Once the dynamic track finishes, the Streamlit dashboard updates the score and merges the user-land memory dumps and kernel-space logs into the active case file without requiring any manual analyst refresh.
+  \item \textbf{Dynamic Dashboard Update:} Once the dynamic track finishes, the React dashboard updates the score and merges the user-land memory dumps and kernel-space logs into the active case file without requiring any manual analyst refresh.
 \end{itemize}
 
-\subsubsection*{Stage 7: Operational Deployment: Streamlit SOC Dashboard}
-The entire multi-stage pipeline is exposed via a Python-native \textbf{Streamlit} dashboard, serving as the central operational hub for SOC analysts. Rather than interacting with abstract scripts, analysts use the dashboard for drag-and-drop binary uploads (APKs), real-time execution tracking, and interactive visualizations of the SHAP feature attributions. The interface renders the final LLaMA-3 case files dynamically, allowing for one-click PDF exports of the CERT-In compliance reports, shifting Kavach.ai from a backend engine into a fully deployable software asset.
+\subsubsection*{Stage 7: Operational Deployment: React SOC Dashboard}
+The entire multi-stage pipeline is exposed via a Python-native \textbf{React} dashboard, serving as the central operational hub for SOC analysts. Rather than interacting with abstract scripts, analysts use the dashboard for drag-and-drop binary uploads (APKs), real-time execution tracking, and interactive visualizations of the SHAP feature attributions. The interface renders the final LLaMA-3 case files dynamically, allowing for one-click PDF exports of the CERT-In compliance reports, shifting Kavach.ai from a backend engine into a fully deployable software asset.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{IV. DIFFERENTIATION \& STRATEGIC ADVANTAGE}
@@ -547,7 +547,7 @@ For \textbf{Kavach.ai (Problem Statement 1)}, the technology stack uses a lightw
 \toprule
 Pipeline Stage & Tools \& Purpose \\
 \midrule
-Frontend \& Orchestration & \textbf{Streamlit} (SOC Analyst Dashboard), \textbf{FastAPI} microservices, \textbf{SQLModel} ORM session validation, and a \textbf{Redis}-backed asynchronous task runner. \\
+Frontend \& Orchestration & \textbf{React} (SOC Analyst Dashboard), \textbf{FastAPI} microservices, \textbf{SQLModel} ORM session validation, and a \textbf{Redis}-backed asynchronous task runner. \\
 \addlinespace
 Static Analysis & \textbf{APKTool} (bytecode extraction), \textbf{JADX} (decompilation fallback), and \textbf{Androguard} (Control Flow / Data Flow Graph construction). \\
 \addlinespace
@@ -579,8 +579,8 @@ kavach_ai/
 |-- infrastructure/             # DevOps & Local Sandbox Environment
 |   |-- docker-compose.yml      # WSL PostgreSQL & Redis containers natively
 |   |-- Dockerfile.api          # FastAPI API service builder
-|   `-- Dockerfile.streamlit    # Streamlit dashboard UI builder
-|-- frontend/                   # Streamlit SOC Dashboard (React 19 on standby)
+|   `-- Dockerfile.React    # React dashboard UI builder
+|-- frontend/                   # React SOC Dashboard (React 19 on standby)
 |   |-- app.py                  # Main landing interface (APK Uploader)
 |   |-- assets/styles.css       # Custom styling
 |   |-- components/             # Reusable widgets (render_shap_graphs.py)

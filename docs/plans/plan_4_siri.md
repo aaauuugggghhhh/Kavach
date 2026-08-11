@@ -59,7 +59,7 @@ def test_status_endpoint():
 Create a modern radial gauge indicating malware probability:
 ```python
 import plotly.graph_objects as go
-import streamlit as st
+import React as st
 
 def render_threat_gauge(score: float):
     # score: value between 0.0 and 1.0 (malware probability)
@@ -96,5 +96,5 @@ def render_threat_gauge(score: float):
 
 ## 🎯 Verification Checklist for LLM
 1. All pytest test cases run successfully via `pytest backend/tests/` command.
-2. Threat gauge chart renders correctly in a test Streamlit view.
+2. Threat gauge chart renders correctly in a test React view.
 3. API test suite mocks db queries cleanly, preventing writes from leaking into production.

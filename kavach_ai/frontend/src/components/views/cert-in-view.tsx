@@ -1,9 +1,22 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileText, Download, CheckSquare } from 'lucide-react';
 import { useDetonation } from '@/context/DetonationContext';
 
 export const CertInView: React.FC = () => {
-  const { apkDetails } = useDetonation();
+  const { apkDetails, jobId } = useDetonation();
+  const [reportData, setReportData] = useState<any>(null);
+
+  useEffect(() => {
+    if (jobId) {
+      fetch(`/api/report/${jobId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            setReportData(data.report);
+          }
+        });
+    }
+  }, [jobId]);
 
   return (
     <div className="space-y-6">
@@ -33,7 +46,7 @@ export const CertInView: React.FC = () => {
           <div className="grid grid-cols-3 gap-4 border-b border-border/50 pb-4">
             <div className="col-span-1 text-muted-foreground font-semibold">2. Type of Incident:</div>
             <div className="col-span-2 text-foreground flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-primary" /> Malicious Code (Malware / Spyware / Trojan)
+              <CheckSquare className="w-4 h-4 text-primary" /> {reportData?.incident_type || 'Malicious Code (Malware / Spyware / Trojan)'}
             </div>
           </div>
 
@@ -43,23 +56,59 @@ export const CertInView: React.FC = () => {
               <div><span className="text-muted-foreground">OS:</span> Android 11.0 (API 30)</div>
               <div><span className="text-muted-foreground">App Name:</span> {apkDetails?.name || 'Unknown APK'}</div>
               <div><span className="text-muted-foreground">Package ID:</span> {apkDetails?.package || 'com.unknown.package'}</div>
+              <div><span className="text-muted-foreground">Threat Level:</span> {reportData?.threat_level || 'Unknown'}</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 pb-4">
+          <div className="grid grid-cols-3 gap-4 pb-4 border-b border-border/50">
             <div className="col-span-1 text-muted-foreground font-semibold">4. Indicators of Compromise (IoCs):</div>
             <div className="col-span-2 space-y-2 text-xs">
-              <div className="bg-black/40 p-2 border border-border">
-                <span className="text-destructive font-semibold">Network:</span> Attempted connection to 103.45.XX.XX:8080 (TCP)
-              </div>
-              <div className="bg-black/40 p-2 border border-border">
-                <span className="text-destructive font-semibold">Host:</span> Dynamic loading of hidden DEX payloads via `DexClassLoader`.
-              </div>
-              <div className="bg-black/40 p-2 border border-border">
-                <span className="text-destructive font-semibold">Behavior:</span> Automated interception and exfiltration of SMS messages.
-              </div>
+              {reportData?.indicators_of_compromise ? (
+                Array.isArray(reportData.indicators_of_compromise) ? (
+                  reportData.indicators_of_compromise.map((ioc: any, i: number) => (
+                    <div key={i} className="bg-black/40 p-2 border border-border">
+                      {typeof ioc === 'string' ? ioc : JSON.stringify(ioc)}
+                    </div>
+                  ))
+                ) : (
+                  <div className="bg-black/40 p-2 border border-border">
+                    {JSON.stringify(reportData.indicators_of_compromise)}
+                  </div>
+                )
+              ) : (
+                <>
+                  <div className="bg-black/40 p-2 border border-border">
+                    <span className="text-destructive font-semibold">Network:</span> Attempted connection to 103.45.XX.XX:8080 (TCP)
+                  </div>
+                  <div className="bg-black/40 p-2 border border-border">
+                    <span className="text-destructive font-semibold">Host:</span> Dynamic loading of hidden DEX payloads via `DexClassLoader`.
+                  </div>
+                  <div className="bg-black/40 p-2 border border-border">
+                    <span className="text-destructive font-semibold">Behavior:</span> Automated interception and exfiltration of SMS messages.
+                  </div>
+                </>
+              )}
             </div>
           </div>
+
+          {reportData?.compliance_violations && (
+            <div className="grid grid-cols-3 gap-4 pb-4">
+              <div className="col-span-1 text-muted-foreground font-semibold">5. Compliance Violations:</div>
+              <div className="col-span-2 space-y-2 text-xs">
+                {Array.isArray(reportData.compliance_violations) ? (
+                  reportData.compliance_violations.map((violation: string, i: number) => (
+                    <div key={i} className="bg-black/40 p-2 border border-border text-destructive">
+                      {violation}
+                    </div>
+                  ))
+                ) : (
+                  <div className="bg-black/40 p-2 border border-border text-destructive">
+                    {reportData.compliance_violations}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

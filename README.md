@@ -32,7 +32,7 @@ Please refer to these documents before starting development:
 
 Each teammate is assigned a specific development track. Ensure you follow your individual step-by-step tasks and guidelines:
 
-* Track 1 (Galipalli Pranav Raj): Dynamic Sandbox and Streamlit Frontend Lead. Integrates emulator sandboxing, Frida bypass scripts, eBPF logging, and front-end components. Refer to [plan_1_pranav_raj.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/plan_1_pranav_raj.md).
+* Track 1 (Galipalli Pranav Raj): Dynamic Sandbox and React Frontend Lead. Integrates emulator sandboxing, Frida bypass scripts, eBPF logging, and front-end components. Refer to [plan_1_pranav_raj.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/plan_1_pranav_raj.md).
 * Track 2 (Abhinav Mucharla): Static, ML, and LLM Core. Implements Androguard extraction, JNI mapping, backward program slicing, SecureBERT-2.0 inference, PartitionSHAP, and Groq LLaMA-3 reporting. Refer to [plan_2_abhinav.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/plan_2_abhinav.md).
 * Track 3 (Pranav Krishna): FastAPI Backend, Database, and Task Queue Lead. Responsible for FastAPI endpoints, SQLModel BCNF models, Redis background workers, and telemetry merger. Refer to [plan_3_pranav_krishna.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/plan_3_pranav_krishna.md).
 * Track 4 (Siri Chandana): Testing and UI Support Specialist. Handles FastAPI route testing, SQLModel transaction verification, pipeline mock testing, and Plotly visualization charts. Refer to [plan_4_siri.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/plan_4_siri.md).
@@ -45,7 +45,7 @@ Development is divided into five main phases:
 2. Parallel Analysis Track: Build the decompiler / slicing wrappers and dynamic sandbox Frida hooks in isolation.
 3. ML Inference and Attribution: Set up the SecureBERT tokenizer, classification window, and PartitionSHAP calculations.
 4. Telemetry Synthesis and Reports: Combine static and dynamic logs and trigger Groq report generation.
-5. UI Integration and Testing: Connect Streamlit components to real endpoints and execute pytest verification.
+5. UI Integration and Testing: Connect React components to real endpoints and execute pytest verification.
 
 ## Model Training Setup
 
@@ -53,7 +53,28 @@ The model training pipeline is isolated in the root `training/` directory.
 
 ### Environment Installation
 
-1. Create a dedicated virtual environment:
+#### 1. System Dependencies (External Tools)
+The static decompilation pipeline requires the following Java-based reverse engineering binaries to be installed globally on your system path.
+*(Note: If these tools are not installed, the UI will automatically fall back to serving mock code payloads for demonstration purposes.)*
+
+**Windows Installation (via Chocolatey or Scoop):**
+
+If you don't have Chocolatey installed, open an **Administrator PowerShell** and run:
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+```
+
+Once installed, restart your terminal and run:
+```bash
+choco install apktool jadx -y
+```
+# OR
+scoop install apktool jadx
+```
+
+#### 2. Python Environment
+
+Create a dedicated virtual environment:
    ```bash
    python -m venv venv
    source venv/bin/activate

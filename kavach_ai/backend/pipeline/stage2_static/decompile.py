@@ -593,7 +593,7 @@ def extract_raw_dex(
                 dex_file.dex_name,
             )
             try:
-                dex_object = _load_androguard_dex(copied.read_bytes())
+                dex_object = _load_androguard_dex(archive.read(dex_file.archive_path))
             except ImportError as exc:
                 issues.append(
                     _raw_dex_issue(
@@ -718,6 +718,12 @@ def run_apktool(
     apk = Path(apk_path).resolve()
     output = Path(output_path).resolve()
     executable = shutil.which("apktool")
+    if executable is None:
+        # Fallback for Windows Chocolatey installs when PATH hasn't reloaded
+        choco_fallback = Path(r"C:\ProgramData\chocolatey\bin\apktool.exe")
+        if choco_fallback.exists():
+            executable = str(choco_fallback)
+
     command = (
         executable or "apktool",
         "d",
@@ -798,6 +804,12 @@ def run_jadx(
     apk = Path(apk_path).resolve()
     output = Path(output_path).resolve()
     executable = shutil.which("jadx")
+    if executable is None:
+        # Fallback for Windows Chocolatey installs when PATH hasn't reloaded
+        choco_fallback = Path(r"C:\ProgramData\chocolatey\bin\jadx.exe")
+        if choco_fallback.exists():
+            executable = str(choco_fallback)
+
     command = (
         executable or "jadx",
         "--no-res",
@@ -1426,10 +1438,13 @@ def _copy_validated_dex(
     return target, None
 
 
-def _load_androguard_dex(raw_dex: bytes) -> object:
+def _load_androguard_dex(raw_dex: bytes | str | Path) -> object:
     from androguard.core.dex import DEX
 
-    return DEX(raw_dex)
+    if isinstance(raw_dex, (str, Path)):
+        with open(raw_dex, "rb") as f:
+            raw_dex = f.read()
+    return DEX(bytes(raw_dex))
 
 
 def _parse_raw_dex_object(

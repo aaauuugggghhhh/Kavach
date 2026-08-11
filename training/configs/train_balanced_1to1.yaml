@@ -1,7 +1,7 @@
 schema_version: training-config-v2
 run: {mode: train, name: securebert-balanced-1to1, seed: 42, output_dir: training/outputs/securebert-balanced-1to1, overwrite_output_dir: false, resume_from_checkpoint: null}
 data:
-  root: training/data
+  root: training/data/data
   train_split: train
   eval_split: validation
   tokenizer_fingerprint: null
@@ -47,4 +47,4 @@ trainer:
   seed: 42
   data_seed: 42
   pad_to_multiple_of: 8
-wandb: {mode: offline, project: kavach-securebert, entity: null, group: null, job_type: training, tags: [train, balanced-1to1], notes: "Deterministic epoch-cycling 1:1 training subset; natural validation distribution", log_model: false, watch_model: false}
+wandb: {mode: online, project: kavach-securebert, entity: null, group: null, job_type: training, tags: [train, balanced-1to1], notes: "Deterministic epoch-cycling 1:1 training subset; natural validation distribution", log_model: false, watch_model: false}

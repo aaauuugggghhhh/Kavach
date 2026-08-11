@@ -1,11 +1,11 @@
 # LLM Prompt Context: Plan 1 (Galipalli Pranav Raj)
-## Track 1: Dynamic Sandbox & Streamlit Frontend Lead
+## Track 1: Dynamic Sandbox & React Frontend Lead
 
 > [!IMPORTANT]  
-> Before generating code, refer to the [Integration Roadmap](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/integration_roadmap.md) and the [BUILD_GUIDE.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/BUILD_GUIDE.md) to understand chronological dependencies. Streamlit endpoints require the FastAPI API skeleton from Plan 3. Use mock payloads if those endpoints are not yet fully implemented.
+> Before generating code, refer to the [Integration Roadmap](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/integration_roadmap.md) and the [BUILD_GUIDE.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/BUILD_GUIDE.md) to understand chronological dependencies. React endpoints require the FastAPI API skeleton from Plan 3. Use mock payloads if those endpoints are not yet fully implemented.
 > **DO NOT modify or touch any other files in the workspace that are not explicitly listed in this plan.**
 
-> **FOR THE LLM:** You are an AI coding assistant helping Galipalli Pranav Raj implement the **Dynamic Sandbox** and **Streamlit SOC Frontend** for Kavach.ai. Below are the context, exact requirements, directory structures, and code snippets to complete this track. Follow these guidelines strictly.
+> **FOR THE LLM:** You are an AI coding assistant helping Galipalli Pranav Raj implement the **Dynamic Sandbox** and **React SOC Frontend** for Kavach.ai. Below are the context, exact requirements, directory structures, and code snippets to complete this track. Follow these guidelines strictly.
 
 ---
 
@@ -24,7 +24,7 @@
 - [ ] **eBPF Log Extractor:** Push precompiled eBPF tracing probes to the emulator kernel, dump process activities to JSON, and parse sys-calls, files opened, and sockets created.
 - [ ] **Detonation Scripts:** Automate intents triggering (`BOOT_COMPLETED`, etc.) via ADB subprocess commands to detonate sleeping droppers.
 
-### 🖥️ Streamlit Frontend (Stage 6/7 - Phase 6)
+### 🖥️ React Frontend (Stage 6/7 - Phase 6)
 > [!IMPORTANT]
 > **Do not begin frontend binding tasks until all FastAPI backend routes, database sessions, and core pipeline modules are fully implemented and verified by Track 3 & Track 4.**
 
@@ -38,9 +38,9 @@
 
 
 ### 🔁 Client-side Polling Pattern
-Use a polling loop in Streamlit to fetch task states:
+Use a polling loop in React to fetch task states:
 ```python
-import streamlit as st
+import React as st
 import requests
 import time
 
@@ -93,7 +93,7 @@ def run_frida_bypass(package_name, script_path):
 ---
 
 ## 🎯 Verification Checklist for LLM
-1. Streamlit app boots via `streamlit run app.py`.
+1. React app boots via `React run app.py`.
 2. The upload function sends the APK to the FastAPI server and begins state polling.
 3. Frida spawns correctly and hooks target methods.
 4. eBPF tracing probes successfully capture dynamic actions and dump them into `/tmp/telemetry.json` or equivalent workspace logs.

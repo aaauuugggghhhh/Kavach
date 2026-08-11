@@ -62,9 +62,9 @@ APK ──► Manifest Triage ──► SecureBERT Inference ──► SHAP Attr
 
 ## 2. Tools & Resources
 
-### 2.1 Streamlit (Frontend Dashboard)
+### 2.1 React (Frontend Dashboard)
 - Serves as the SOC-facing presentation layer: drag-and-drop APK upload, live job status, SHAP visualizations, report download.
-- Kept intentionally "light" — no heavy computation happens in the Streamlit process itself, it only renders state pulled from the backend.
+- Kept intentionally "light" — no heavy computation happens in the React process itself, it only renders state pulled from the backend.
 
 ### 2.2 FastAPI (Backend Orchestrator)
 - Owns job dispatching, async workers, and the `/upload` and `/jobs/{id}` endpoints.
@@ -241,7 +241,7 @@ Merges static + dynamic tracks, resolves contradictions, scrapes post-detonation
 Groq-hosted LLaMA-3 compiles fused telemetry into a Pydantic-validated forensic report and CERT-In compliance form, with a graceful-degradation fallback if structured parsing fails.
 
 ### 5.8 SOC Dashboard & Job Polling
-Streamlit UI polls `GET /jobs/{id}` every 2 seconds, showing "Analyzing" → "Completed" states without blocking on long-running analysis.
+React UI polls `GET /jobs/{id}` every 2 seconds, showing "Analyzing" → "Completed" states without blocking on long-running analysis.
 
 ### 5.9 Historical Reports View
 Browse past analyses via `apk_hash` lookup — ties directly into the audit-trail design of the database schema.
@@ -270,7 +270,7 @@ kavach_ai/
 ├── infrastructure/
 │   ├── docker-compose.yml      # PostgreSQL, Redis
 │   ├── Dockerfile.api
-│   └── Dockerfile.streamlit
+│   └── Dockerfile.React
 │
 ├── frontend/
 │   ├── app.py
@@ -322,7 +322,7 @@ kavach_ai/
 ## 8. Phase-by-Phase Build Plan
 
 ### Phase 1: Project Setup
-Repo scaffold, Docker Compose (Postgres + Redis), FastAPI skeleton, Streamlit skeleton.
+Repo scaffold, Docker Compose (Postgres + Redis), FastAPI skeleton, React skeleton.
 
 ### Phase 2: Manifest Triage
 Androguard integration, 10ms permission filter, obfuscation density scoring.
@@ -348,8 +348,8 @@ Groq API integration, Pydantic schema enforcement, regex fallback parser, CERT-I
 ### Phase 9: Automated Testing & Verification
 Implement pytest suites to cover all API endpoints, database operations, and pipeline mock cycles. Refer to [plan_4_siri.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/plan_4_siri.md) for verification guidelines.
 
-### Phase 10: Streamlit Dashboard & Integration
-Construct Streamlit view layout, hook client-side job status polling, implement Plotly visual threat charts, and integrate interactive SHAP highlights. Refer to [plan_1_pranav_raj.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/plan_1_pranav_raj.md) for final UI assembly.
+### Phase 10: React Dashboard & Integration
+Construct React view layout, hook client-side job status polling, implement Plotly visual threat charts, and integrate interactive SHAP highlights. Refer to [plan_1_pranav_raj.md](file:///c:/Users/Admin/Documents/Projects/Kavach/docs/plans/plan_1_pranav_raj.md) for final UI assembly.
 
 ---
 
