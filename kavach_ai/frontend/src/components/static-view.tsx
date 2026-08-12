@@ -280,7 +280,7 @@ const DEFAULT_BEHAVIOR_RULES: BehaviorRule[] = [
 ];
 
 export const StaticView: React.FC = () => {
-  const { staticResults, telemetry, viewDashboard, simulationMode, currentFile, runStaticScan } = useDetonation();
+  const { staticResults, telemetry, viewDashboard, simulationMode, currentFile, runStaticScan, detonate } = useDetonation();
   const [activeTab, setActiveTab] = useState<'code_analysis' | 'behavior_analysis' | 'application_permissions' | 'abused_permissions' | 'manifest_analysis'>('code_analysis');
   const [viewingFile, setViewingFile] = useState<{ title: string, type: 'xml' | 'java' | 'smali', content: string | null, loading: boolean } | null>(null);
   const [manifestSearch, setManifestSearch] = useState('');
@@ -591,7 +591,14 @@ export const StaticView: React.FC = () => {
               <RefreshCw className="w-3.5 h-3.5" /> Rescan
             </button>
             <button 
-              onClick={viewDashboard}
+              onClick={() => {
+                if (currentFile) {
+                  viewDashboard();
+                  detonate(currentFile);
+                } else {
+                  alert("No active file session found. Please upload an APK first.");
+                }
+              }}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-500 text-xs font-bold transition-all cursor-pointer shadow-sm w-full rounded-none"
             >
               <Play className="w-3.5 h-3.5 fill-emerald-500" /> Start Dynamic Analysis
