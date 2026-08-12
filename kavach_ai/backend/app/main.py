@@ -8,6 +8,11 @@ import hashlib
 import traceback
 import uuid
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+# Initialize environment variables
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env'))
 
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware

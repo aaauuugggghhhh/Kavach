@@ -3,6 +3,12 @@ from pydantic import BaseModel
 import os
 import json
 import requests
+from dotenv import load_dotenv
+
+# Load env variables from project root
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), '.env'))
+
 try:
     from groq import Groq
 except ImportError:
@@ -56,21 +62,33 @@ def generate_report_groq(merged: dict) -> dict:
         return fallback_generate_report(merged)
     
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-    prompt = f"Analyze the following malware telemetry and output a JSON matching the JointForensicReport schema: {json.dumps(merged)}"
+    schema_str = json.dumps(JointForensicReport.model_json_schema(), indent=2)
+    prompt = (
+        f"You are a malware forensic analyst. Analyze the following malware telemetry data and generate a JSON "
+        f"matching this JSON schema:\n{schema_str}\n\n"
+        f"Telemetry Data:\n{json.dumps(merged)}"
+    )
     try:
         completion = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
         content = completion.choices[0].message.content
-        return json.loads(content)
+        # Validate structure matches expected JointForensicReport
+        report = JointForensicReport.model_validate_json(content)
+        return report.model_dump()
     except Exception as e:
         print(f"Groq generation failed: {e}")
         return fallback_generate_report(merged)
 
 def generate_report_ollama(merged: dict) -> dict:
-    prompt = f"Analyze the following malware telemetry and output a JSON matching the JointForensicReport schema: {json.dumps(merged)}"
+    schema_str = json.dumps(JointForensicReport.model_json_schema(), indent=2)
+    prompt = (
+        f"You are a malware forensic analyst. Analyze the following malware telemetry data and generate a JSON "
+        f"matching this JSON schema:\n{schema_str}\n\n"
+        f"Telemetry Data:\n{json.dumps(merged)}"
+    )
     try:
         response = requests.post(
             "http://localhost:11434/api/chat",
@@ -84,7 +102,9 @@ def generate_report_ollama(merged: dict) -> dict:
         )
         response.raise_for_status()
         content = response.json()["message"]["content"]
-        return json.loads(content)
+        # Validate structure matches expected JointForensicReport
+        report = JointForensicReport.model_validate_json(content)
+        return report.model_dump()
     except Exception as e:
         print(f"Ollama generation failed: {e}")
         return fallback_generate_report(merged)
