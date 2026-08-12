@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDetonation } from '@/context/DetonationContext';
 import { 
-  ShieldAlert, Eye, ArrowLeft, Download, Printer, CheckCircle2, Search, Zap, Code
+  ShieldAlert, Eye, ArrowLeft, Download, Printer, Search
 } from 'lucide-react';
 
 export interface FindingItem {
@@ -25,13 +25,12 @@ export const KavachScorecard: React.FC = () => {
     }
   }, [telemetry, staticResults, loadRecentScan]);
 
-  const { securityScore, grade, riskRating, privacyRiskScore, privacyRiskLevel, findings, counts } = useMemo(() => {
+  const { securityScore, grade, riskRating, privacyRiskScore, privacyRiskLevel, findings } = useMemo(() => {
     const objectionRoot = telemetry?.objection_root_bypass || false;
     const objectionSsl = telemetry?.objection_ssl_pinning_bypass || false;
     const filesAccessed = telemetry?.ebpf_telemetry?.files_accessed || [];
     const networkConns = telemetry?.ebpf_telemetry?.network_connections || [];
     const syscalls = telemetry?.ebpf_telemetry?.syscalls || [];
-    const hasRevShell = networkConns.some((c: any) => c.port === 4444);
 
     const mlVerdict = staticResults?.ml_metrics?.verdict || 'BENIGN';
     const mlProb = staticResults?.ml_metrics?.malicious_probability || 0;
@@ -191,26 +190,15 @@ export const KavachScorecard: React.FC = () => {
       });
     }
 
-    const c = {
-      Critical: fList.filter(f => f.severity === 'Critical').length,
-      High: fList.filter(f => f.severity === 'High').length,
-      Medium: fList.filter(f => f.severity === 'Medium').length,
-      Low: fList.filter(f => f.severity === 'Low').length,
-      Info: fList.filter(f => f.severity === 'Info').length,
-    };
-
     return {
       securityScore: finalSecurityScore,
       grade: currentGrade,
       riskRating: currentRiskRating,
       privacyRiskScore: finalPrivacyRiskScore,
       privacyRiskLevel: finalPrivacyRiskLevel,
-      findings: fList,
-      counts: c
+      findings: fList
     };
   }, [telemetry, staticResults, simulationMode]);
-
-  const totalFindings = findings.length;
 
   const filteredFindings = useMemo(() => {
     return findings.filter(f => {

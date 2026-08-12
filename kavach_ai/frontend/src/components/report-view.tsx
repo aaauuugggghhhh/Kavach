@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
 import { useDetonation } from '@/context/DetonationContext';
-import { 
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
-} from 'recharts';
 import { Download, Award, ArrowRight, FileSearch, Network, Globe, ShieldCheck, Crosshair } from 'lucide-react';
 
 export const ReportView: React.FC = () => {
-  const { telemetry, apkDetails, reset, viewScorecard, simulationMode } = useDetonation();
+  const { telemetry, apkDetails, reset, viewScorecard } = useDetonation();
   const [activeTab, setActiveTab] = useState<'files' | 'sockets' | 'dns' | 'permissions' | 'mitre'>('files');
 
   const objectionRoot = telemetry?.objection_root_bypass || false;

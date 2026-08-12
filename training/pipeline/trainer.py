@@ -263,7 +263,7 @@ def build_training_arguments(config: Mapping[str, Any], output_dir: str | Path |
         gradient_accumulation_steps=trainer["gradient_accumulation_steps"],
         num_train_epochs=trainer["num_train_epochs"], max_steps=trainer["max_steps"],
         learning_rate=trainer["learning_rate"], weight_decay=trainer["weight_decay"],
-        warmup_ratio=trainer["warmup_ratio"], max_grad_norm=trainer["max_grad_norm"],
+        warmup_steps=trainer["warmup_ratio"], max_grad_norm=trainer["max_grad_norm"],
         eval_strategy=trainer["eval_strategy"], eval_steps=trainer["eval_steps"],
         save_strategy=trainer["save_strategy"], save_steps=trainer["save_steps"],
         logging_strategy="steps", logging_steps=trainer["logging_steps"],
