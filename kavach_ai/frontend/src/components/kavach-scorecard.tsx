@@ -231,40 +231,45 @@ export const KavachScorecard: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in zoom-in-95 duration-300">
+      {/* Load Google Fonts */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-border">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-zinc-800 no-print">
         <div>
           <button 
             onClick={viewDashboard}
-            className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all mb-2 cursor-pointer"
+            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-all mb-2 cursor-pointer font-['Space_Grotesk']"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Dashboard
           </button>
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+            <h2 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2 font-['Space_Grotesk'] uppercase">
               Holistic Security & Privacy Scorecard
             </h2>
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border border-primary/40 text-primary bg-primary/10 rounded-none shadow-[0_0_8px_rgba(59,130,246,0.3)]">
+            <span className="text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 border border-primary/20 text-primary bg-primary/10 rounded-none font-['Space_Grotesk']">
               Certified Audit
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 font-['Space_Grotesk']">
           <button 
             onClick={handleExportJson}
-            className="flex items-center gap-2 px-3.5 py-1.5 bg-muted hover:bg-muted/80 border border-border text-foreground text-xs font-semibold transition-all cursor-pointer rounded-none"
+            className="flex items-center gap-2 px-3.5 py-1.5 bg-[#0D0E10] hover:bg-[#15171C] border border-zinc-800 text-zinc-300 text-[10px] font-bold tracking-wider transition-all cursor-pointer rounded-none"
           >
             <Download className="w-3.5 h-3.5" />
-            Export JSON
+            EXPORT JSON
           </button>
           <button 
             onClick={handlePrint}
-            className="flex items-center gap-2 px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold transition-all cursor-pointer rounded-none shadow-[0_0_10px_rgba(59,130,246,0.4)]"
+            className="flex items-center gap-2 px-4 py-1.5 bg-primary hover:bg-primary/95 text-primary-foreground text-[10px] font-bold tracking-wider transition-all cursor-pointer rounded-none"
           >
             <Printer className="w-3.5 h-3.5" />
-            Print Report
+            PRINT REPORT
           </button>
         </div>
       </div>
@@ -272,99 +277,113 @@ export const KavachScorecard: React.FC = () => {
       {/* Top Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Security Score */}
-        <div className="p-6 border border-border bg-card/60 backdrop-blur-md flex flex-col justify-between relative overflow-hidden transition-all hover:bg-card/80">
+        {/* Overall Security Score */}
+        <div className="p-6 border border-zinc-800 bg-[#0D0E10] flex flex-col justify-between rounded-none transition-all hover:border-zinc-700/80">
           <div className="flex justify-between items-start">
-            <div>
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">Overall Security Score</span>
-              <span className="text-xs text-muted-foreground">Static & Dynamic Fusion</span>
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block font-['Space_Grotesk']">Overall Security Score</span>
+              <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider block">Static & Dynamic Fusion</span>
             </div>
-            <span className={`text-xs font-bold px-2 py-0.5 border bg-background/50 rounded-none ${scoreColor}`}>
+            <span className={`text-[9px] font-bold px-2 py-0.5 border bg-[#080809] rounded-none font-['Space_Grotesk'] tracking-widest ${scoreColor}`}>
               GRADE {grade}
             </span>
           </div>
 
-          <div className="flex items-center gap-6 my-6">
-            <div className="relative w-24 h-24 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90 drop-shadow-md" viewBox="0 0 36 36">
-                <path className="text-muted" strokeWidth="2" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path 
-                  className={securityScore < 50 ? 'text-destructive' : securityScore < 75 ? 'text-orange-500' : 'text-emerald-400'}
-                  strokeDasharray={`${securityScore}, 100`} 
-                  strokeWidth="2.5" stroke="currentColor" fill="none" 
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
-                />
-              </svg>
-              <div className="absolute flex flex-col items-center">
-                <span className="text-3xl font-black text-foreground">{securityScore}</span>
-              </div>
+          <div className="relative w-24 h-24 flex items-center justify-center mx-auto my-4">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+              <path className="text-zinc-900" strokeWidth="2" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path 
+                className={securityScore < 50 ? 'text-destructive' : securityScore < 75 ? 'text-orange-500' : 'text-emerald-400'}
+                strokeDasharray={`${securityScore}, 100`} 
+                strokeWidth="2.5" stroke="currentColor" fill="none" 
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
+              />
+            </svg>
+            <div className="absolute flex flex-col items-center">
+              <span className="text-2xl font-bold text-zinc-100 font-['Space_Grotesk']">{securityScore}</span>
             </div>
-            <div className="space-y-1">
-              <div className="text-sm font-bold text-foreground">
-                {securityScore < 50 ? 'Severe Vulnerabilities' : securityScore < 75 ? 'Moderate Exposure' : 'Strong Security Posture'}
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Aggregated from SecureBERT ML static inference and eBPF dynamic telemetry hooks.
-              </p>
+          </div>
+
+          <div className="space-y-1.5 text-center">
+            <div className="text-xs font-bold text-zinc-200 font-['Space_Grotesk'] uppercase tracking-wider">
+              {securityScore < 50 ? 'Severe Vulnerabilities' : securityScore < 75 ? 'Moderate Exposure' : 'Strong Security Posture'}
             </div>
+            <p className="text-[10px] text-zinc-500 leading-relaxed font-['JetBrains_Mono'] max-w-xs mx-auto">
+              Aggregated from SecureBERT ML static inference and eBPF dynamic telemetry hooks.
+            </p>
           </div>
         </div>
 
         {/* Risk Rating */}
-        <div className="p-6 border border-border bg-card/60 backdrop-blur-md flex flex-col justify-between transition-all hover:bg-card/80">
+        <div className="p-6 border border-zinc-800 bg-[#0D0E10] flex flex-col justify-between rounded-none transition-all hover:border-zinc-700/80">
           <div className="flex justify-between items-start">
-            <div>
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">Threat Risk Rating</span>
-              <span className="text-xs text-muted-foreground">Exploitability Assessment</span>
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block font-['Space_Grotesk']">Threat Risk Rating</span>
+              <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider block">Exploitability Assessment</span>
             </div>
-            <ShieldAlert className={`w-5 h-5 ${riskRating === 'CRITICAL' ? 'text-destructive' : riskRating === 'HIGH' ? 'text-orange-500' : 'text-emerald-400'}`} />
+            <ShieldAlert className={`w-4 h-4 ${riskRating === 'CRITICAL' ? 'text-destructive' : riskRating === 'HIGH' ? 'text-orange-500' : 'text-emerald-400'}`} />
           </div>
 
-          <div className="my-6">
-            <div className={`text-4xl font-black tracking-tight mb-4 ${
-              riskRating === 'CRITICAL' ? 'text-destructive drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 
-              riskRating === 'HIGH' ? 'text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]' : 
-              'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]'
+          <div className="text-center my-4">
+            <div className={`text-2xl font-bold tracking-widest font-['Space_Grotesk'] ${
+              riskRating === 'CRITICAL' ? 'text-destructive' : 
+              riskRating === 'HIGH' ? 'text-orange-500' : 
+              'text-emerald-400'
             }`}>
               {riskRating} RISK
             </div>
-            <div className="space-y-2 text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
-              <div className="flex items-center justify-between border-b border-border/50 pb-1">
-                <span>Code Toxicity:</span>
-                <span className="text-foreground">{staticResults ? 'Analyzed' : 'Pending'}</span>
-              </div>
-              <div className="flex items-center justify-between border-b border-border/50 pb-1">
-                <span>Runtime Hooks:</span>
-                <span className="text-foreground">{telemetry ? 'Traced' : 'Pending'}</span>
-              </div>
+          </div>
+
+          <div className="space-y-2 text-[10px] uppercase tracking-wider font-bold text-zinc-500 font-['JetBrains_Mono'] pt-2 border-t border-zinc-900">
+            <div className="flex items-center justify-between pb-1">
+              <span>Code Toxicity:</span>
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 border ${
+                staticResults 
+                  ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10' 
+                  : 'border-zinc-800 text-zinc-600 bg-zinc-900/50'
+              }`}>
+                {staticResults ? 'ANALYZED' : 'PENDING'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Runtime Hooks:</span>
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 border ${
+                telemetry 
+                  ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10' 
+                  : 'border-zinc-800 text-zinc-600 bg-zinc-900/50'
+              }`}>
+                {telemetry ? 'TRACED' : 'PENDING'}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Privacy Risk */}
-        <div className="p-6 border border-border bg-card/60 backdrop-blur-md flex flex-col justify-between transition-all hover:bg-card/80">
+        <div className="p-6 border border-zinc-800 bg-[#0D0E10] flex flex-col justify-between rounded-none transition-all hover:border-zinc-700/80">
           <div className="flex justify-between items-start">
-            <div>
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">Privacy Exposure</span>
-              <span className="text-xs text-muted-foreground">Data Harvesting Potential</span>
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block font-['Space_Grotesk']">Privacy Exposure</span>
+              <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider block">Data Harvesting Potential</span>
             </div>
-            <Eye className="w-5 h-5 text-purple-400" />
+            <Eye className="w-4 h-4 text-purple-400" />
           </div>
 
-          <div className="my-6">
-            <div className="flex items-baseline gap-2 mb-4">
-              <span className="text-4xl font-black text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.5)]">{privacyRiskScore}%</span>
-            </div>
+          <div className="text-center my-4">
+            <span className="text-3xl font-bold text-purple-400 font-['Space_Grotesk'] tracking-tight block">
+              {privacyRiskScore}%
+            </span>
+          </div>
 
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground mb-1">
-                  <span>Exposure Level</span>
-                  <span className="text-foreground">{privacyRiskLevel}</span>
-                </div>
-                <div className="w-full bg-muted h-1 overflow-hidden">
-                  <div className="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-1 transition-all" style={{ width: `${privacyRiskScore}%` }} />
-                </div>
+          <div className="space-y-3 pt-2 border-t border-zinc-900 font-['JetBrains_Mono']">
+            <div>
+              <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-1.5">
+                <span>Exposure Level</span>
+                <span className={`${
+                  privacyRiskLevel === 'CRITICAL' || privacyRiskLevel === 'HIGH' ? 'text-purple-400' : 'text-zinc-300'
+                }`}>{privacyRiskLevel}</span>
+              </div>
+              <div className="w-full bg-zinc-900 h-1 rounded-none overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-1 transition-all" style={{ width: `${privacyRiskScore}%` }} />
               </div>
             </div>
           </div>
@@ -373,74 +392,85 @@ export const KavachScorecard: React.FC = () => {
       </div>
 
       {/* Findings Panel */}
-      <div className="border border-border bg-card/40 backdrop-blur-sm p-6">
+      <div className="border border-zinc-800 bg-[#0D0E10] p-6 rounded-none">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
-            <h3 className="text-lg font-bold text-foreground">Audit Findings log</h3>
+            <h3 className="text-sm font-bold text-zinc-200 uppercase tracking-wider font-['Space_Grotesk']">Audit Findings log</h3>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex border border-border bg-background p-0.5">
+          <div className="flex flex-wrap items-center gap-3 font-['Space_Grotesk']">
+            <div className="flex border border-zinc-800 bg-[#080809] p-0.5 text-[9px] font-bold tracking-widest">
               {['All', 'Critical', 'High', 'Medium', 'Privacy'].map((sev) => (
                 <button
                   key={sev}
                   onClick={() => setFilterSeverity(sev)}
-                  className={`px-3 py-1 text-[10px] uppercase font-bold tracking-widest transition-all cursor-pointer rounded-none ${
-                    filterSeverity === sev ? 'bg-primary text-primary-foreground shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  className={`px-3 py-1 cursor-pointer transition-all ${
+                    filterSeverity === sev ? 'bg-primary text-primary-foreground font-extrabold' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'
                   }`}
                 >
-                  {sev}
+                  {sev.toUpperCase()}
                 </button>
               ))}
             </div>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted-foreground" />
+            <div className="relative font-['JetBrains_Mono']">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-600" />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="SEARCH..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-48 pl-9 pr-3 py-1.5 bg-background border border-border text-[11px] text-foreground focus:outline-none focus:border-primary transition-all rounded-none"
+                className="w-48 pl-9 pr-3 py-1.5 bg-[#080809] border border-zinc-800 text-[10px] text-zinc-300 font-semibold focus:outline-none focus:border-primary transition-all rounded-none uppercase tracking-wider"
               />
             </div>
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filteredFindings.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground text-[11px] uppercase font-bold tracking-widest border border-dashed border-border bg-background/50">
-              No matching findings.
+            <div className="p-8 text-center text-zinc-500 text-[10px] font-bold font-mono uppercase tracking-widest border border-dashed border-zinc-800 bg-[#080809]/50">
+              No matching findings found in current telemetry execution.
             </div>
           ) : (
-            filteredFindings.map((item) => (
-              <div key={item.id} className="border border-border p-4 bg-background/60 hover:bg-background/90 transition-all group backdrop-blur-md">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 border border-primary/20">{item.id}</span>
-                    <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{item.title}</h4>
+            filteredFindings.map((item) => {
+              // Left border logic based on severity
+              const severityBorder = 
+                item.severity === 'Critical' ? 'border-l-4 border-l-red-500' :
+                item.severity === 'High' ? 'border-l-4 border-l-orange-500' :
+                item.severity === 'Medium' ? 'border-l-4 border-l-amber-500' :
+                'border-l-4 border-l-blue-500';
+
+              return (
+                <div key={item.id} className={`border border-zinc-850 p-5 bg-[#15171C]/25 hover:bg-[#15171C]/45 transition-all group backdrop-blur-md ${severityBorder}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-900/50 pb-3">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-[9px] font-bold text-primary bg-primary/10 px-2 py-0.5 border border-primary/20">{item.id}</span>
+                      <h4 className="text-xs font-bold text-zinc-200 group-hover:text-primary transition-colors font-['Space_Grotesk'] uppercase tracking-wide">{item.title}</h4>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 font-['Space_Grotesk']">
+                      {item.isPrivacy && (
+                        <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 border border-purple-500/20 text-purple-400 bg-purple-500/10">Privacy Risk</span>
+                      )}
+                      <span className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 border ${
+                        item.severity === 'Critical' ? 'border-red-500/20 text-red-400 bg-red-500/10' :
+                        item.severity === 'High' ? 'border-orange-500/20 text-orange-400 bg-orange-500/10' :
+                        item.severity === 'Medium' ? 'border-amber-500/20 text-amber-400 bg-amber-500/10' :
+                        'border-blue-500/20 text-blue-400 bg-blue-500/10'
+                      }`}>
+                        {item.severity}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {item.isPrivacy && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 border border-purple-500/30 text-purple-400 bg-purple-500/10">Privacy Risk</span>
-                    )}
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 border ${
-                      item.severity === 'Critical' ? 'border-destructive/30 text-destructive bg-destructive/10' :
-                      item.severity === 'High' ? 'border-orange-500/30 text-orange-400 bg-orange-500/10' :
-                      item.severity === 'Medium' ? 'border-amber-500/30 text-amber-400 bg-amber-500/10' :
-                      'border-blue-500/30 text-blue-400 bg-blue-500/10'
-                    }`}>
-                      {item.severity}
-                    </span>
+                  
+                  <p className="text-[11px] font-['JetBrains_Mono'] leading-relaxed text-zinc-400 mt-3">
+                    {item.description}
+                  </p>
+                  
+                  <div className="mt-3 bg-[#080809] border border-zinc-900/80 p-3">
+                    <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block font-['Space_Grotesk']">Evidence</span>
+                    <code className="text-[10px] font-mono text-emerald-400 break-all leading-normal whitespace-pre-wrap">{item.evidence}</code>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
-                  {item.description}
-                </p>
-                <div className="mt-3 bg-muted/30 border-l-2 border-border/80 p-3">
-                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Evidence</span>
-                  <code className="text-[10px] font-mono text-emerald-400 break-all">{item.evidence}</code>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

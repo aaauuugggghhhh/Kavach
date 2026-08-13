@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
-from kavach_ai.backend.app.db.models import APK, CertInReport
+from kavach_ai.backend.app.db.models import APK, CertInReport, SmaliSlice
 from kavach_ai.backend.app.db.session import engine
 from kavach_ai.backend.pipeline.stage6_synthesis.merge import merge_telemetry
 from kavach_ai.backend.pipeline.stage6_synthesis.report_gen import generate_report_groq
@@ -506,7 +506,55 @@ async def detonate_stream(
                 telemetry = await task
 
             yield f"data: {json.dumps({'type': 'log', 'message': 'Generating final report...'})}\n\n"
-            merged = merge_telemetry(static_data={"permissions": [], "obfuscated": False, "triage_score": 0, "securebert_probability": 0, "slices": [], "indicators": []}, dynamic_data=telemetry, job_id=job_id, apk_hash=apk_hash)
+            
+            actual_static = {
+                "permissions": [],
+                "obfuscated": False,
+                "triage_score": 0.0,
+                "securebert_probability": 0.0,
+                "slices": [],
+                "indicators": []
+            }
+            
+            async with AsyncSession(engine) as session:
+                db_cert = (await session.execute(select(CertInReport).where(CertInReport.apk_hash == apk_hash))).scalar_one_or_none()
+                if db_cert and db_cert.mitre_attack_json:
+                    prev_report = db_cert.mitre_attack_json
+                    prev_forensic = prev_report.get("forensic", {})
+                    
+                    apk_res = await session.execute(select(APK).where(APK.apk_hash == apk_hash))
+                    apk = apk_res.scalar_one_or_none()
+                    triage_score = apk.triage_score if (apk and apk.triage_score is not None) else 0.0
+                    
+                    risk_score = prev_forensic.get("risk_score", 0)
+                    
+                    slices_res = await session.execute(select(SmaliSlice).where(SmaliSlice.apk_hash == apk_hash))
+                    slices_list = slices_res.scalars().all()
+                    
+                    actual_static = {
+                        "permissions": prev_report.get("cert_in", {}).get("indicators_of_compromise", {}).get("permissions", []),
+                        "obfuscated": False,
+                        "triage_score": triage_score,
+                        "securebert_probability": risk_score / 100.0,
+                        "slices": [
+                            {"probability_score": s.probability_score, "slice_text": s.slice_text, "source_method": s.source_method}
+                            for s in slices_list
+                        ],
+                        "indicators": prev_forensic.get("static_findings", [])
+                    }
+
+            merged = merge_telemetry(static_data=actual_static, dynamic_data=telemetry, job_id=job_id, apk_hash=apk_hash)
+            if apk:
+                file_size_mb = apk.file_size / (1024 * 1024)
+                pkg_name = apk.filename
+                if pkg_name.lower().endswith(".apk"):
+                    pkg_name = pkg_name[:-4]
+                merged["apk_details"] = {
+                    "name": apk.filename,
+                    "size": f"{file_size_mb:.2f} MB",
+                    "package": pkg_name,
+                    "hash": apk_hash
+                }
             report = generate_report_groq(merged)
             
             async with AsyncSession(engine) as session:

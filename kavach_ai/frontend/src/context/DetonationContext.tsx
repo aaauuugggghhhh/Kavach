@@ -52,6 +52,9 @@ export interface StaticScanResults {
     triage_score?: number;
     code_signals?: string[];
     manifest_indicators?: string[];
+    reflection_indicators?: string[];
+    dynamic_loading_indicators?: string[];
+    obfuscation_indicators?: string[];
     activities?: any[];
     services?: any[];
     receivers?: any[];

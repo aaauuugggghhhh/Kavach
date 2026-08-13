@@ -11,7 +11,7 @@
       "sys_openat"
     ],
     "files_accessed": [
-      "/data/user/0/org.android.system/shared_prefs/config.xml",
+      "/data/user/0/com.example.filemanager/shared_prefs/config.xml",
       "/proc/self/maps",
       "/system/bin/app_process32"
     ],

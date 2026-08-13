@@ -195,50 +195,6 @@ interface CodeAnalysisIssue {
   files: string;
 }
 
-const DEFAULT_CODE_ANALYSIS_ISSUES: CodeAnalysisIssue[] = [
-  {
-    no: 1,
-    issue: 'IP Address disclosure',
-    severity: 'warning',
-    standards: [
-      { name: 'CWE', value: 'CWE-200: Information Exposure' },
-      { name: 'OWASP MASVS', value: 'MSTG-CODE-2' }
-    ],
-    files: 'Show Files'
-  },
-  {
-    no: 2,
-    issue: 'Files may contain hardcoded sensitive information like usernames, passwords, keys etc.',
-    severity: 'warning',
-    standards: [
-      { name: 'CWE', value: 'CWE-312: Cleartext Storage of Sensitive Information' },
-      { name: 'OWASP Top 10', value: 'M9: Reverse Engineering' },
-      { name: 'OWASP MASVS', value: 'MSTG-STORAGE-14' }
-    ],
-    files: 'Show Files'
-  },
-  {
-    no: 3,
-    issue: 'The App logs information. Sensitive information should never be logged.',
-    severity: 'info',
-    standards: [
-      { name: 'CWE', value: 'CWE-532: Insertion of Sensitive Information into Log File' },
-      { name: 'OWASP MASVS', value: 'MSTG-STORAGE-3' }
-    ],
-    files: 'Show Files'
-  },
-  {
-    no: 4,
-    issue: 'The App uses an insecure Random Number Generator.',
-    severity: 'warning',
-    standards: [
-      { name: 'CWE', value: 'CWE-330: Use of Insufficiently Random Values' },
-      { name: 'OWASP Top 10', value: 'M5: Insufficient Cryptography' }
-    ],
-    files: 'Show Files'
-  }
-];
-
 interface BehaviorRule {
   id: string;
   behaviour: string;
@@ -246,38 +202,167 @@ interface BehaviorRule {
   files: string[];
 }
 
-const DEFAULT_BEHAVIOR_RULES: BehaviorRule[] = [
-  {
-    id: '00012',
-    behaviour: 'Read data and put it into a buffer stream',
-    labels: ['file'],
-    files: ['org/teleal/common/io/IO.java']
-  },
-  {
-    id: '00013',
-    behaviour: 'Read file and put it into a stream',
-    labels: ['file'],
-    files: ['okio/Okio.java', 'org/teleal/common/io/IO.java', 'org/teleal/common/xml/DOMParser.java']
-  },
-  {
-    id: '00022',
-    behaviour: 'Open a file from given absolute path of the file',
-    labels: ['file'],
-    files: ['org/teleal/common/jdoc/EasyDoclet.java', 'org/teleal/common/mock/http/MockServletContext.java']
-  },
-  {
-    id: '00036',
-    behaviour: 'Get resource file from res/raw directory',
-    labels: ['reflection'],
-    files: ['com/pure/iris/domain/logging/FileLoggingTree.java']
-  },
-  {
-    id: '00039',
-    behaviour: 'Start a web server',
-    labels: ['control', 'network'],
-    files: ['org/teleal/cling/transport/impl/apache/StreamServerImpl.java']
+const generateCodeIssues = (staticResults: any): CodeAnalysisIssue[] => {
+  const issues: CodeAnalysisIssue[] = [];
+  const triage = staticResults?.triage || {};
+  let count = 1;
+
+  const reflections = triage.reflection_indicators || [];
+  if (reflections.length > 0) {
+    issues.push({
+      no: count++,
+      issue: 'Dynamic Reflection Class Loading',
+      severity: 'warning',
+      standards: [
+        { name: 'CWE', value: 'CWE-470: Use of Externally-Controlled Input to Select Classes or Code' },
+        { name: 'OWASP MASVS', value: 'MSTG-CODE-4 (Code Quality)' }
+      ],
+      files: reflections.map((r: string) => r.replace('REFLECTION:', '')).join(', ')
+    });
   }
-];
+
+  const dynamicLoaders = triage.dynamic_loading_indicators || [];
+  if (dynamicLoaders.length > 0) {
+    issues.push({
+      no: count++,
+      issue: 'Dynamic Bytecode Execution or Library Load',
+      severity: 'high',
+      standards: [
+        { name: 'CWE', value: 'CWE-913: Improper Control of Dynamically-Identified Variables' },
+        { name: 'OWASP Top 10', value: 'M9: Reverse Engineering' }
+      ],
+      files: dynamicLoaders.map((d: string) => d.replace('DYNAMIC_LOADING:', '')).join(', ')
+    });
+  }
+
+  const obfuscations = triage.obfuscation_indicators || [];
+  if (obfuscations.length > 0) {
+    issues.push({
+      no: count++,
+      issue: 'Highly Obfuscated Code Base / Evasion Markers',
+      severity: 'warning',
+      standards: [
+        { name: 'CWE', value: 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm' },
+        { name: 'OWASP Top 10', value: 'M9: Reverse Engineering' }
+      ],
+      files: obfuscations.join(', ')
+    });
+  }
+
+  if (obfuscations.some((o: string) => o.toLowerCase().includes('crypto')) || reflections.length > 2) {
+    issues.push({
+      no: count++,
+      issue: 'Potential Use of Insecure Pseudo-Random Number Generator',
+      severity: 'info',
+      standards: [
+        { name: 'CWE', value: 'CWE-330: Use of Insufficiently Random Values' },
+        { name: 'OWASP Top 10', value: 'M5: Insufficient Cryptography' }
+      ],
+      files: 'java/security/SecureRandom, java/util/Random'
+    });
+  }
+
+  const minSdk = triage.min_sdk;
+  if (minSdk && minSdk < 21) {
+    issues.push({
+      no: count++,
+      issue: `Legacy Minimum Android SDK version (${minSdk}) specified`,
+      severity: 'warning',
+      standards: [
+        { name: 'CWE', value: 'CWE-1104: Use of Unmaintained Third-Party Components' }
+      ],
+      files: 'AndroidManifest.xml'
+    });
+  }
+
+  if (issues.length === 0) {
+    issues.push({
+      no: count++,
+      issue: 'No severe static code quality vulnerabilities detected',
+      severity: 'secure',
+      standards: [
+        { name: 'CWE', value: 'N/A' },
+        { name: 'OWASP MASVS', value: 'Compliant' }
+      ],
+      files: 'None'
+    });
+  }
+
+  return issues;
+};
+
+const generateBehaviorRules = (staticResults: any): BehaviorRule[] => {
+  const rules: BehaviorRule[] = [];
+  const triage = staticResults?.triage || {};
+  const permissions = triage.permissions || [];
+  const combinations = triage.permission_combinations || [];
+  let count = 10001;
+
+  if (triage.reflection_indicators && triage.reflection_indicators.length > 0) {
+    rules.push({
+      id: String(count++),
+      behaviour: 'Dynamically locates class definitions and invokes methods at runtime using Reflection APIs',
+      labels: ['reflection', 'evasion'],
+      files: triage.reflection_indicators.map((r: string) => r.split(':')[1] || r)
+    });
+  }
+
+  if (triage.dynamic_loading_indicators && triage.dynamic_loading_indicators.length > 0) {
+    rules.push({
+      id: String(count++),
+      behaviour: 'Loads external DEX bytecode files, class loaders, or JNI native shared libraries',
+      labels: ['dynamic_load', 'execution'],
+      files: triage.dynamic_loading_indicators.map((d: string) => d.split(':')[1] || d)
+    });
+  }
+
+  if (permissions.includes('android.permission.RECEIVE_SMS') || permissions.includes('android.permission.READ_SMS')) {
+    rules.push({
+      id: String(count++),
+      behaviour: 'Intercepts, reads, or monitors incoming short messages (SMS)',
+      labels: ['sms', 'privacy'],
+      files: ['AndroidManifest.xml (SMS_RECEIVER)']
+    });
+  }
+
+  if (permissions.includes('android.permission.SYSTEM_ALERT_WINDOW')) {
+    rules.push({
+      id: String(count++),
+      behaviour: 'Creates persistent overlay alerts or views that display over other running applications',
+      labels: ['overlay', 'ui_hijack'],
+      files: ['AndroidManifest.xml (ALERT_WINDOW)']
+    });
+  }
+
+  if (permissions.includes('android.permission.BIND_ACCESSIBILITY_SERVICE')) {
+    rules.push({
+      id: String(count++),
+      behaviour: 'Registers a custom system accessibility service capable of screen scraping and logging keystrokes',
+      labels: ['accessibility', 'credential_theft'],
+      files: ['AndroidManifest.xml (ACCESSIBILITY_SERVICE)']
+    });
+  }
+
+  if (combinations.includes('SMS_EXFILTRATION') || combinations.includes('ACCESSIBILITY_SMS_OVERLAY')) {
+    rules.push({
+      id: String(count++),
+      behaviour: 'Combines dynamic alerts, accessibility bindings, and SMS capabilities to automate data theft or bank fraud',
+      labels: ['spyware', 'financial_fraud'],
+      files: ['Multi-Permission Context Trigger']
+    });
+  }
+
+  if (rules.length === 0) {
+    rules.push({
+      id: String(count++),
+      behaviour: 'Declared baseline permissions present. Standard execution path.',
+      labels: ['benign'],
+      files: ['AndroidManifest.xml']
+    });
+  }
+
+  return rules;
+};
 
 export const StaticView: React.FC = () => {
   const { staticResults, telemetry, viewDashboard, simulationMode, currentFile, runStaticScan, detonate } = useDetonation();
@@ -411,7 +496,8 @@ export const StaticView: React.FC = () => {
     issue.description.toLowerCase().includes(manifestSearch.toLowerCase())
   );
 
-  const filteredCodeIssues = DEFAULT_CODE_ANALYSIS_ISSUES.filter(issue => {
+  const codeIssues = generateCodeIssues(staticResults);
+  const filteredCodeIssues = codeIssues.filter(issue => {
     const searchLower = codeSearch.toLowerCase();
     const issueMatch = issue.issue.toLowerCase().includes(searchLower);
     const standardMatch = issue.standards.some(std => 
@@ -421,7 +507,8 @@ export const StaticView: React.FC = () => {
     return issueMatch || standardMatch;
   });
 
-  const filteredBehaviorRules = DEFAULT_BEHAVIOR_RULES.filter(rule => {
+  const behaviorRules = generateBehaviorRules(staticResults);
+  const filteredBehaviorRules = behaviorRules.filter(rule => {
     const searchLower = behaviorSearch.toLowerCase();
     const idMatch = rule.id.toLowerCase().includes(searchLower);
     const behaviourMatch = rule.behaviour.toLowerCase().includes(searchLower);
@@ -928,7 +1015,7 @@ export const StaticView: React.FC = () => {
 
               {/* Pagination footer */}
               <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-4 border-t border-border">
-                <span>Showing {filteredCodeIssues.length} of {DEFAULT_CODE_ANALYSIS_ISSUES.length} entries</span>
+                <span>Showing {filteredCodeIssues.length} of {codeIssues.length} entries</span>
                 <div className="flex gap-1">
                   <button className="px-2 py-1 bg-secondary text-foreground rounded-none border border-border cursor-pointer">Previous</button>
                   <button className="px-3 py-1 bg-primary text-primary-foreground rounded-none border border-primary font-bold">1</button>
@@ -1004,11 +1091,10 @@ export const StaticView: React.FC = () => {
 
               {/* Pagination footer */}
               <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-4 border-t border-border">
-                <span>Showing {filteredBehaviorRules.length} of {DEFAULT_BEHAVIOR_RULES.length} entries</span>
+                <span>Showing {filteredBehaviorRules.length} of {behaviorRules.length} entries</span>
                 <div className="flex gap-1">
                   <button className="px-2 py-1 bg-secondary text-foreground rounded-none border border-border cursor-pointer">Previous</button>
                   <button className="px-3 py-1 bg-primary text-primary-foreground rounded-none border border-primary font-bold">1</button>
-                  <button className="px-3 py-1 bg-secondary text-foreground rounded-none border border-border cursor-pointer">2</button>
                   <button className="px-2 py-1 bg-secondary text-foreground rounded-none border border-border cursor-pointer">Next</button>
                 </div>
               </div>
@@ -1107,30 +1193,104 @@ export const StaticView: React.FC = () => {
           {activeTab === 'abused_permissions' && (
             <>
               <div>
-                <span className="text-sm font-bold text-foreground">Abused Permissions & Risk Vectors</span>
+                <span className="text-sm font-bold text-foreground">Abused Permissions & Threat Vector Profiler</span>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Static manifest permissions cross-referenced with high-risk malware patterns.
+                  Static manifest permissions cross-referenced with high-risk Android malware signatures.
                 </p>
               </div>
 
-              {/* Row: Abused Permissions */}
-              <div className="grid grid-cols-1 gap-4 p-4 bg-muted/20 border border-border rounded-none text-xs">
-                <div className="space-y-2">
-                  <div className="flex justify-between font-bold text-foreground">
-                    <span>Flagged Malware Combinations</span>
-                    <span className="text-red-500">{abusedCombinations.length} Detected</span>
+              {/* Threat Vector Profiler Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                {[
+                  {
+                    name: "SMS Exfiltration Risk",
+                    description: "Intercepts or reads incoming text messages to bypass OTP checks.",
+                    detected: permissionsList.some(p => p.includes('SMS')),
+                    permissions: ["READ_SMS", "RECEIVE_SMS", "SEND_SMS"],
+                    level: "High Risk"
+                  },
+                  {
+                    name: "Overlay Phishing / Hijacking",
+                    description: "Draws active overlays over target banking or login apps.",
+                    detected: permissionsList.includes('android.permission.SYSTEM_ALERT_WINDOW'),
+                    permissions: ["SYSTEM_ALERT_WINDOW"],
+                    level: "High Risk"
+                  },
+                  {
+                    name: "Accessibility Keylogging",
+                    description: "Logs keystrokes and extracts on-screen interface text.",
+                    detected: permissionsList.includes('android.permission.BIND_ACCESSIBILITY_SERVICE'),
+                    permissions: ["BIND_ACCESSIBILITY_SERVICE"],
+                    level: "Critical"
+                  },
+                  {
+                    name: "Startup Boot Persistence",
+                    description: "Launches background service controllers automatically at startup.",
+                    detected: permissionsList.includes('android.permission.RECEIVE_BOOT_COMPLETED'),
+                    permissions: ["RECEIVE_BOOT_COMPLETED"],
+                    level: "Suspicious"
+                  },
+                  {
+                    name: "Spyware & Location Tracking",
+                    description: "Tracks physical device coordinates or records background audio.",
+                    detected: permissionsList.some(p => p.includes('LOCATION') || p.includes('CONTACTS') || p.includes('RECORD_AUDIO') || p.includes('CAMERA')),
+                    permissions: ["ACCESS_FINE_LOCATION", "READ_CONTACTS", "RECORD_AUDIO", "CAMERA"],
+                    level: "High Risk"
+                  },
+                  {
+                    name: "Dynamic Bytecode Execution",
+                    description: "Loads compiled secondary dex payloads or JNI shared libraries.",
+                    detected: (staticResults?.triage?.dynamic_loading_indicators || []).length > 0 || (staticResults?.triage?.reflection_indicators || []).length > 0,
+                    permissions: ["DexClassLoader", "PathClassLoader", "System.loadLibrary"],
+                    level: "High Risk"
+                  }
+                ].map((vector, idx) => (
+                  <div key={idx} className="border border-border p-4 bg-card/25 flex flex-col justify-between space-y-3">
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="font-bold text-foreground text-xs">{vector.name}</span>
+                        <span className={`px-1.5 py-0.5 text-[8px] font-bold uppercase border ${
+                          vector.detected
+                            ? vector.level === 'Critical'
+                              ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                              : vector.level === 'Suspicious'
+                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                : 'bg-red-500/10 text-red-500 border-red-500/20'
+                            : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                        }`}>
+                          {vector.detected ? 'DETECTED' : 'SECURE'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">{vector.description}</p>
+                    </div>
+                    <div className="space-y-1 pt-1.5 border-t border-border/40">
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider block">Target Triggers</span>
+                      <div className="flex flex-wrap gap-1">
+                        {vector.permissions.map((p, pidx) => {
+                          const isTriggered = permissionsList.some(ap => ap.includes(p)) || (
+                            vector.detected && (p === 'DexClassLoader' || p === 'PathClassLoader' || p === 'System.loadLibrary')
+                          );
+                          return (
+                            <span 
+                              key={pidx} 
+                              className={`text-[8px] font-mono px-1 py-0.5 border ${
+                                isTriggered 
+                                  ? 'bg-red-500/10 text-red-400 border-red-500/20 font-semibold' 
+                                  : 'bg-zinc-800/40 text-zinc-500 border-zinc-700/30'
+                              }`}
+                            >
+                              {p.replace('android.permission.', '')}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full bg-secondary h-2">
-                    <div className="bg-red-500 h-2" style={{ width: `${Math.min(abusedCombinations.length * 33, 100)}%` }}></div>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed font-mono">
-                    {abusedCombinations.length > 0 ? abusedCombinations.join(', ') : 'None detected'}
-                  </p>
-                </div>
+                ))}
               </div>
 
               {/* JNI & Native Library Scan */}
-              <div className="pt-4 border-t border-border mt-4 space-y-2">
+              <div className="pt-6 border-t border-border mt-6 space-y-3">
                 <div>
                   <span className="text-xs font-bold text-foreground block">JNI Bridge Shared Objects</span>
                   <p className="text-[10px] text-muted-foreground mt-0.5">Scanned shared object libraries (.so) and native hooks.</p>
@@ -1145,35 +1305,17 @@ export const StaticView: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
-                      {simulationMode ? (
-                        <>
-                          <tr className="hover:bg-accent/10 transition-colors">
-                            <td className="py-3 font-mono text-[11px]">/lib/arm64-v8a/libobjection.so</td>
-                            <td className="py-3 text-muted-foreground">ARM64</td>
-                            <td className="py-3 text-right text-red-500 font-semibold">Frida Bypass Agent</td>
-                          </tr>
-                          <tr className="hover:bg-accent/10 transition-colors">
-                            <td className="py-3 font-mono text-[11px]">/lib/arm64-v8a/libnative-helper.so</td>
-                            <td className="py-3 text-muted-foreground">ARM64</td>
-                            <td className="py-3 text-right text-amber-500 font-semibold">Reflection Linker</td>
-                          </tr>
-                          <tr className="hover:bg-accent/10 transition-colors">
-                            <td className="py-3 font-mono text-[11px]">/lib/arm64-v8a/libcrypto-secure.so</td>
-                            <td className="py-3 text-muted-foreground">ARM64</td>
-                            <td className="py-3 text-right text-muted-foreground">Encryption Bridge</td>
-                          </tr>
-                        </>
-                      ) : (telemetry?.native_libraries || []).length === 0 ? (
+                      {(staticResults?.native_libraries || telemetry?.native_libraries || []).length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="py-4 text-muted-foreground/60 italic text-center">
-                            No custom native libraries (.so) loaded during detonation.
+                          <td colSpan={3} className="py-8 text-muted-foreground/60 italic text-center">
+                            No compiled native libraries (.so) detected in this package.
                           </td>
                         </tr>
                       ) : (
-                        (telemetry?.native_libraries || []).map((lib, idx) => (
+                        (staticResults?.native_libraries || telemetry?.native_libraries || []).map((lib: string, idx: number) => (
                           <tr key={idx} className="hover:bg-accent/10 transition-colors">
-                            <td className="py-3 font-mono text-[11px]">{lib}</td>
-                            <td className="py-3 text-muted-foreground">ARM64/Dynamic</td>
+                            <td className="py-3 font-mono text-[11px] text-foreground">{lib}</td>
+                            <td className="py-3 text-muted-foreground font-semibold">ARM64/Dynamic</td>
                             <td className="py-3 text-right text-muted-foreground">Loaded at Runtime</td>
                           </tr>
                         ))

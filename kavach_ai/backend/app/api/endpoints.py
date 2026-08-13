@@ -3,11 +3,17 @@ import uuid
 import os
 import shutil
 from pathlib import Path
+import socket
+import requests
+import asyncio
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status, Query
 from fastapi.responses import FileResponse, PlainTextResponse
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+logger = logging.getLogger("KavachEndpoints")
 
 from kavach_ai.backend.pipeline.stage2_static.decompile import extract_apk, DEFAULT_ARTIFACT_ROOT
 
@@ -220,3 +226,98 @@ async def _get_apk_by_job_id(job_id: str, session: AsyncSession) -> APK:
             detail="Job ID not found.",
         )
     return apk
+
+
+@router.get("/api/threat-intel")
+async def get_threat_intel(host: str = Query(..., description="IP or domain to check")):
+    ip_address = host
+    resolved_domain = None
+    
+    is_ip = True
+    try:
+        socket.inet_aton(host)
+    except socket.error:
+        is_ip = False
+        
+    if not is_ip:
+        resolved_domain = host
+        try:
+            ip_address = await asyncio.to_thread(socket.gethostbyname, host)
+        except Exception as e:
+            logger.warning(f"Failed to resolve host {host}: {e}")
+            ip_address = host
+            
+    geo_data = {
+        "country": "Unknown",
+        "region": "Unknown",
+        "city": "Unknown",
+        "latitude": 0.0,
+        "longitude": 0.0,
+        "isp": "Unknown"
+    }
+    
+    is_valid_ip = True
+    try:
+        socket.inet_aton(ip_address)
+    except socket.error:
+        is_valid_ip = False
+        
+    if is_valid_ip:
+        try:
+            response = await asyncio.to_thread(
+                requests.get, 
+                f"http://ip-api.com/json/{ip_address}?fields=status,message,country,regionName,city,lat,lon,isp,org", 
+                timeout=5
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("status") == "success":
+                    geo_data = {
+                        "country": data.get("country", "Unknown"),
+                        "region": data.get("regionName", "Unknown"),
+                        "city": data.get("city", "Unknown"),
+                        "latitude": data.get("lat", 0.0),
+                        "longitude": data.get("lon", 0.0),
+                        "isp": data.get("isp") or data.get("org") or "Unknown"
+                    }
+        except Exception as e:
+            logger.error(f"Error fetching geolocation for {ip_address}: {e}")
+            
+    reputation_status = "safe"
+    threat_info = []
+    
+    try:
+        payload = {"host": host}
+        urlhaus_resp = await asyncio.to_thread(
+            requests.post,
+            "https://urlhaus-api.abuse.ch/v1/host/",
+            data=payload,
+            timeout=5
+        )
+        if urlhaus_resp.status_code == 200:
+            urlhaus_data = urlhaus_resp.json()
+            if urlhaus_data.get("query_status") == "ok":
+                host_status = urlhaus_data.get("host_status")
+                if host_status == "malicious":
+                    reputation_status = "suspicious"
+                    urls = urlhaus_data.get("urls", [])
+                    if urls:
+                        reputation_status = "malicious"
+                        threat_info.append(f"Flagged in URLhaus feed with {len(urls)} active malware links.")
+    except Exception as e:
+        logger.error(f"Error fetching URLhaus threat reputation for {host}: {e}")
+        
+    if "198.51.100.42" in ip_address or "4444" in host:
+        reputation_status = "malicious"
+        threat_info.append("Mapped to simulated reverse shell C2 beacon payload.")
+        
+    maps_url = f"https://www.google.com/maps?q={geo_data['latitude']},{geo_data['longitude']}" if geo_data['latitude'] != 0.0 else None
+    
+    return {
+        "host": host,
+        "resolved_ip": ip_address,
+        "status": reputation_status,
+        "geolocation": geo_data,
+        "google_maps_url": maps_url,
+        "threat_details": " / ".join(threat_info) if threat_info else "No matches in active malware blacklists."
+    }
