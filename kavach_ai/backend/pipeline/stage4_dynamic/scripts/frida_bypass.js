@@ -161,7 +161,73 @@ Java.perform(function () {
     }
 
     // ==========================================
-    // 3. TELEMETRY COLLECTION HOOKS
+    // 3. TIME DILUTION & SLEEP EVASION BYPASS
+    // ==========================================
+    try {
+        const ThreadClass = Java.use("java.lang.Thread");
+        ThreadClass.sleep.overload('long').implementation = function (millis) {
+            try {
+                if (millis > 50) {
+                    console.log("[Kavach-Sandbox] Time dilution: Thread.sleep(" + millis + "ms) intercepted and accelerated to 10ms");
+                    return this.sleep(10);
+                }
+            } catch (e) {
+                console.log("[Kavach-Sandbox] Warning in Thread.sleep(long) hook: " + e);
+            }
+            return this.sleep(millis);
+        };
+
+        ThreadClass.sleep.overload('long', 'int').implementation = function (millis, nanos) {
+            try {
+                if (millis > 50) {
+                    console.log("[Kavach-Sandbox] Time dilution: Thread.sleep(" + millis + "ms, " + nanos + "ns) intercepted and accelerated to 10ms");
+                    return this.sleep(10, 0);
+                }
+            } catch (e) {
+                console.log("[Kavach-Sandbox] Warning in Thread.sleep(long, int) hook: " + e);
+            }
+            return this.sleep(millis, nanos);
+        };
+    } catch (e) {
+        console.log("[Kavach-Sandbox] Thread.sleep hooks setup skipped: " + e);
+    }
+
+    try {
+        const SystemClock = Java.use("android.os.SystemClock");
+        SystemClock.sleep.overload('long').implementation = function (millis) {
+            try {
+                if (millis > 50) {
+                    console.log("[Kavach-Sandbox] Time dilution: SystemClock.sleep(" + millis + "ms) intercepted and accelerated to 10ms");
+                    return this.sleep(10);
+                }
+            } catch (e) {
+                console.log("[Kavach-Sandbox] Warning in SystemClock.sleep hook: " + e);
+            }
+            return this.sleep(millis);
+        };
+    } catch (e) {
+        console.log("[Kavach-Sandbox] SystemClock.sleep hook setup skipped: " + e);
+    }
+
+    try {
+        const Handler = Java.use("android.os.Handler");
+        Handler.postDelayed.overload('java.lang.Runnable', 'long').implementation = function (runnable, delayMillis) {
+            try {
+                if (delayMillis > 1000) {
+                    console.log("[Kavach-Sandbox] Time dilution: Handler.postDelayed(" + delayMillis + "ms) accelerated to 50ms");
+                    return this.postDelayed(runnable, 50);
+                }
+            } catch (e) {
+                console.log("[Kavach-Sandbox] Warning in Handler.postDelayed hook: " + e);
+            }
+            return this.postDelayed(runnable, delayMillis);
+        };
+    } catch (e) {
+        console.log("[Kavach-Sandbox] Handler.postDelayed hook setup skipped: " + e);
+    }
+
+    // ==========================================
+    // 4. TELEMETRY COLLECTION HOOKS
     // ==========================================
 
     // FileInputStream (Reads)

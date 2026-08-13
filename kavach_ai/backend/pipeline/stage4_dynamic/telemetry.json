@@ -1,6 +1,7 @@
 {
   "objection_root_bypass": true,
   "objection_ssl_pinning_bypass": true,
+  "time_dilution_bypass": true,
   "ebpf_telemetry": {
     "syscalls": [
       "sys_clone",
@@ -11,7 +12,7 @@
       "sys_openat"
     ],
     "files_accessed": [
-      "/data/user/0/com.example.filemanager/shared_prefs/config.xml",
+      "/data/user/0/com.test.pkg/shared_prefs/config.xml",
       "/proc/self/maps",
       "/system/bin/app_process32"
     ],

@@ -31,6 +31,7 @@ class EBPFTracker:
         return {
             "objection_root_bypass": True,
             "objection_ssl_pinning_bypass": True,
+            "time_dilution_bypass": True,
             "ebpf_telemetry": {
                 "syscalls": [
                     "sys_clone", 

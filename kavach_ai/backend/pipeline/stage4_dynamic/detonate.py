@@ -47,6 +47,7 @@ class DetonationOrchestrator:
         self.device_abi = self._get_device_abi() if self.device_connected else "arm64-v8a"
         self.root_bypass_detected = False
         self.ssl_bypass_detected = False
+        self.time_dilution_detected = False
         self.active_admin_component = None
         self.files_accessed = []
         self.network_connections = []
@@ -422,6 +423,8 @@ class DetonationOrchestrator:
                             self.root_bypass_detected = True
                         if "SSLContext.init" in line or "CertificatePinner check bypassed" in line:
                             self.ssl_bypass_detected = True
+                        if "Time dilution" in line:
+                            self.time_dilution_detected = True
                         
                         # Check for file accesses
                         if "[Kavach-Sandbox] File read:" in line or "[Kavach-Sandbox] File write:" in line or "[Kavach-Sandbox] File accessed:" in line:

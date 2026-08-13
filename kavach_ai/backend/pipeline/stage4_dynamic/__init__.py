@@ -54,6 +54,7 @@ def run_dynamic_analysis_pipeline(apk_path: str, package_name: str, duration_sec
             "execution_mode": "LIVE_ADB_FRIDA",
             "objection_root_bypass": orchestrator.root_bypass_detected,
             "objection_ssl_pinning_bypass": orchestrator.ssl_bypass_detected,
+            "time_dilution_bypass": orchestrator.time_dilution_detected,
             "ebpf_telemetry": {
                 "syscalls": syscalls,
                 "files_accessed": list(set(orchestrator.files_accessed)),
