@@ -5,6 +5,10 @@ import time
 import logging
 import zipfile
 import shutil
+import tempfile
+
+from .llm_frida_synthesizer import LLMFridaSynthesizer
+from .fuzzer import ApexIntentFuzzer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("KavachDetonator")
@@ -48,6 +52,11 @@ class DetonationOrchestrator:
         self.root_bypass_detected = False
         self.ssl_bypass_detected = False
         self.time_dilution_detected = False
+        self.time_dilution_count = 0
+        self.time_dilution_events = []
+        self.llm_frida_intercepts = []
+        self.fuzzed_intents = []
+        self.synthesized_hooks_code = ""
         self.active_admin_component = None
         self.files_accessed = []
         self.network_connections = []
@@ -425,6 +434,13 @@ class DetonationOrchestrator:
                             self.ssl_bypass_detected = True
                         if "Time dilution" in line:
                             self.time_dilution_detected = True
+                            self.time_dilution_count += 1
+                            self.time_dilution_events.append(line)
+
+                        # Check for LLM Frida Hook Intercepts
+                        if "[LLM-Frida-Hook]" in line:
+                            if line not in self.llm_frida_intercepts:
+                                self.llm_frida_intercepts.append(line)
                         
                         # Check for file accesses
                         if "[Kavach-Sandbox] File read:" in line or "[Kavach-Sandbox] File write:" in line or "[Kavach-Sandbox] File accessed:" in line:
@@ -562,76 +578,145 @@ class DetonationOrchestrator:
             logger.error(f"Failed to spawn Frida: {e}")
             return None
 
-    def detonate_apk(self, apk_path, package_name, script_path, duration_seconds=10):
+    def detonate_apk(
+        self,
+        apk_path,
+        package_name,
+        script_path,
+        duration_seconds=10,
+        static_sinks=None,
+        custom_hooks_js=None,
+        enable_llm_frida=True,
+        enable_fuzzing=True
+    ):
         logger.info(f"Starting detonation sequence for {package_name}...")
         
-        # 1. Install APK
-        if not self.install_apk(apk_path):
-            logger.error("Detonation aborted: Installation failed.")
-            return False
-            
-        # Auto-grant overlay and accessibility privileges
-        self._grant_malware_privileges(package_name)
-
-        # Detect if the package has a launcher activity
-        has_launcher = True
-        if self.device_connected:
+        # 1. Synthesize and Assemble Dynamic Frida Hooks
+        combined_script_path = script_path
+        temp_script_file = None
+        
+        if enable_llm_frida or custom_hooks_js:
             try:
-                res = subprocess.run(
-                    [self.adb_path, "shell", "cmd", "package", "resolve-activity", "-c", "android.intent.category.LAUNCHER", package_name],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=5
-                )
-                output = (res.stdout or "") + (res.stderr or "")
-                if "activityinfo" not in output.lower() or not output.strip():
-                    has_launcher = False
-                    logger.info(f"No launcher activity found for {package_name}. Configuring Frida to await package process spawn.")
+                if custom_hooks_js:
+                    synthesized_code = custom_hooks_js
+                else:
+                    synthesizer = LLMFridaSynthesizer()
+                    synthesized_code = synthesizer.generate_hooks_from_sinks(
+                        sinks=static_sinks,
+                        package_name=package_name
+                    )
+                
+                self.synthesized_hooks_code = synthesized_code
+                
+                # Read base frida_bypass.js
+                with open(script_path, "r", encoding="utf-8") as bf:
+                    base_js = bf.read()
+                    
+                # Merge base script + synthesized hooks
+                merged_js = f"{base_js}\n\n// --- LLMFRIDA SYNTHESIZED INTERCEPTORS ---\n{synthesized_code}\n"
+                
+                temp_fd, temp_script_path = tempfile.mkstemp(suffix="_llmfrida.js", prefix="kavach_dynamic_")
+                with os.fdopen(temp_fd, "w", encoding="utf-8") as tf:
+                    tf.write(merged_js)
+                    
+                combined_script_path = temp_script_path
+                temp_script_file = temp_script_path
+                logger.info(f"[LLMFrida] Assembled unified Frida script with AI dynamic interceptors at: {combined_script_path}")
             except Exception as e:
-                logger.warning(f"Error checking launcher activity status: {e}")
+                logger.warning(f"[LLMFrida] Script assembly error: {e}. Falling back to default bypass script.")
+                combined_script_path = script_path
 
-        # 2. Spawn Frida Bypass script / Await listener
-        self._ensure_frida_server_running()
-        frida_process = self.spawn_frida_session(package_name, script_path, has_launcher=has_launcher)
-        if frida_process is None:
-            logger.error("Detonation aborted: Failed to spawn Frida process.")
-            return False
-            
-        time.sleep(3) # Wait for hook injection / listener setup
+        try:
+            # 2. Install APK
+            if not self.install_apk(apk_path):
+                logger.error("Detonation aborted: Installation failed.")
+                return False
+                
+            # Auto-grant overlay and accessibility privileges
+            self._grant_malware_privileges(package_name)
 
-        # If headless, wake up receivers now so the process spawns and triggers Frida's await attachment
-        if not has_launcher:
-            logger.info("Headless package detected. Sending intent broadcasts to force spawn process...")
-            self.trigger_intents(package_name, has_launcher=False)
+            # Detect if the package has a launcher activity
+            has_launcher = True
+            if self.device_connected:
+                try:
+                    res = subprocess.run(
+                        [self.adb_path, "shell", "cmd", "package", "resolve-activity", "-c", "android.intent.category.LAUNCHER", package_name],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        timeout=5
+                    )
+                    output = (res.stdout or "") + (res.stderr or "")
+                    if "activityinfo" not in output.lower() or not output.strip():
+                        has_launcher = False
+                        logger.info(f"No launcher activity found for {package_name}. Configuring Frida to await package process spawn.")
+                except Exception as e:
+                    logger.warning(f"Error checking launcher activity status: {e}")
 
-        # Check if Frida process terminated prematurely
-        if frida_process.poll() is not None:
-            logger.error("Detonation aborted: Frida process terminated unexpectedly. Ensure frida-server is running on the device.")
-            return False
+            # 3. Spawn Frida Bypass script / Await listener
+            self._ensure_frida_server_running()
+            frida_process = self.spawn_frida_session(package_name, combined_script_path, has_launcher=has_launcher)
+            if frida_process is None:
+                logger.error("Detonation aborted: Failed to spawn Frida process.")
+                return False
+                
+            time.sleep(3) # Wait for hook injection / listener setup
 
-        # If standard app, trigger intents now to start the interface under hooks
-        if has_launcher:
-            self.trigger_intents(package_name)
+            # If headless, wake up receivers now so the process spawns and triggers Frida's await attachment
+            if not has_launcher:
+                logger.info("Headless package detected. Sending intent broadcasts to force spawn process...")
+                self.trigger_intents(package_name, has_launcher=False)
 
-        # 3. Wait for telemetry gathering duration
-        logger.info(f"Observing behaviors for {duration_seconds} seconds...")
-        for _ in range(duration_seconds):
-            time.sleep(1)
+            # Check if Frida process terminated prematurely
             if frida_process.poll() is not None:
-                logger.warning("Frida process disconnected prematurely during observation loop.")
-                break
+                logger.error("Detonation aborted: Frida process terminated unexpectedly. Ensure frida-server is running on the device.")
+                return False
 
-        # 4. Cleanup Frida
-        if frida_process:
-            logger.info("Terminating Frida background session...")
-            frida_process.terminate()
-            frida_process.wait()
+            # If standard app, trigger intents now to start the interface under hooks
+            if has_launcher:
+                self.trigger_intents(package_name)
 
-        # 5. Uninstall application
-        self.uninstall_apk(package_name)
-        logger.info("Detonation sequence completed.")
-        return True
+            # 4. Observation Loop with Active IPC & Intent Fuzzing
+            logger.info(f"Observing behaviors for {duration_seconds} seconds...")
+            fuzz_halfway_done = False
+            
+            for sec in range(duration_seconds):
+                time.sleep(1)
+                
+                # Halfway through observation, fire deep IPC & Intent fuzzing to awaken evasive banking listeners
+                if enable_fuzzing and sec >= (duration_seconds // 2) and not fuzz_halfway_done:
+                    fuzz_halfway_done = True
+                    if self.device_connected:
+                        try:
+                            fuzzer = ApexIntentFuzzer(adb_path=self.adb_path)
+                            manifest_targets = fuzzer.extract_manifest_targets(package_name)
+                            fuzz_res = fuzzer.fuzz_package(package_name, manifest_targets=manifest_targets)
+                            self.fuzzed_intents.extend(fuzz_res)
+                        except Exception as fuzz_err:
+                            logger.warning(f"[Apex-Fuzzer] Fuzzing encountered non-fatal error: {fuzz_err}")
+
+                if frida_process.poll() is not None:
+                    logger.warning("Frida process disconnected prematurely during observation loop.")
+                    break
+
+            # 5. Cleanup Frida
+            if frida_process:
+                logger.info("Terminating Frida background session...")
+                frida_process.terminate()
+                frida_process.wait()
+
+            # 6. Uninstall application
+            self.uninstall_apk(package_name)
+            logger.info("Detonation sequence completed.")
+            return True
+            
+        finally:
+            # Clean up temp merged script file
+            if temp_script_file and os.path.exists(temp_script_file):
+                try:
+                    os.remove(temp_script_file)
+                except Exception:
+                    pass
 
 if __name__ == "__main__":
     # Test script in simulation mode

@@ -119,7 +119,7 @@ const renderMarkdown = (text: string, theme: 'light' | 'dark') => {
 };
 
 export const KavachReportView: React.FC = () => {
-  const { jobId } = useDetonation();
+  const { jobId, staticResults, apkDetails } = useDetonation();
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [reportTheme, setReportTheme] = useState<'dark' | 'light'>('light');
@@ -190,10 +190,10 @@ export const KavachReportView: React.FC = () => {
   }
 
   // Resolve APK details dynamically for metadata table on Page 1
-  const apkName = reportData?.apk_details?.name || reportData?.forensic?.name || 'app-release.apk';
-  const apkPackage = reportData?.apk_details?.package || reportData?.forensic?.package || 'com.example.app';
-  const apkSize = reportData?.apk_details?.size || reportData?.forensic?.size || 'Unknown Size';
-  const apkHash = reportData?.apk_details?.hash || reportData?.forensic?.hash || 'Unknown Hash';
+  const apkName = staticResults?.apk_details?.name || apkDetails?.name || reportData?.apk_details?.name || reportData?.forensic?.name || 'app-release.apk';
+  const apkPackage = staticResults?.apk_details?.package || apkDetails?.package || reportData?.apk_details?.package || reportData?.forensic?.package || 'com.example.app';
+  const apkSize = staticResults?.apk_details?.size || apkDetails?.size || reportData?.apk_details?.size || reportData?.forensic?.size || 'Unknown Size';
+  const apkHash = staticResults?.apk_details?.hash || reportData?.apk_details?.hash || reportData?.forensic?.hash || 'Unknown Hash';
 
   return (
     <div className="space-y-6">

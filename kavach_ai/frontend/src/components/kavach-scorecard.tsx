@@ -139,6 +139,30 @@ export const KavachScorecard: React.FC = () => {
       });
     }
 
+    if (telemetry?.time_dilution_bypass) {
+      fList.push({
+        id: 'KAV-DYN-03',
+        title: 'Anti-Analysis Time Dilution Sleep Gate Defused',
+        severity: 'High',
+        category: 'Runtime Security',
+        isPrivacy: false,
+        description: 'Chronos Time Dilution engine intercepted and compressed sleep delay loops to force evasive malware detonation.',
+        evidence: `Thread.sleep / SystemClock.sleep hooks compressed ${telemetry?.time_dilution_count || 1} sleep gate(s) to 10ms.`
+      });
+    }
+
+    if (telemetry?.llm_frida_intercepts && telemetry.llm_frida_intercepts.length > 0) {
+      fList.push({
+        id: 'KAV-DYN-04',
+        title: 'LLMFrida Synthesized Interceptors Captured Memory Payloads',
+        severity: 'Critical',
+        category: 'Runtime Security',
+        isPrivacy: true,
+        description: 'Dynamic hooks synthesized by Groq Qwen-2.5-Coder intercepted live decrypted strings and reflection targets.',
+        evidence: telemetry.llm_frida_intercepts[0]
+      });
+    }
+
     networkConns.forEach((c: any, idx: number) => {
       if (c.port === 4444) {
         fList.push({

@@ -35,11 +35,11 @@ class SmaliSlice(SQLModel, table=True):
 
     # Relationships
     apk: APK = Relationship(back_populates="slices")
-    attributions: List["ShapAttribution"] = Relationship(back_populates="slice", cascade_delete=True)
+    attributions: List["LrpAttribution"] = Relationship(back_populates="slice", cascade_delete=True)
 
 
-class ShapAttribution(SQLModel, table=True):
-    __tablename__ = "shap_attributions"
+class LrpAttribution(SQLModel, table=True):
+    __tablename__ = "lrp_attributions"
     __table_args__ = (
         UniqueConstraint("slice_id", "token", name="uq_slice_token"),
     )

@@ -12,7 +12,7 @@
       "sys_openat"
     ],
     "files_accessed": [
-      "/data/user/0/com.test.pkg/shared_prefs/config.xml",
+      "/data/user/0/com.bank.trojan/shared_prefs/config.xml",
       "/proc/self/maps",
       "/system/bin/app_process32"
     ],
@@ -29,5 +29,19 @@
       }
     ]
   },
-  "execution_mode": "SIMULATION_FALLBACK"
+  "execution_mode": "SIMULATION_FALLBACK",
+  "time_dilution_count": 1,
+  "time_dilution_events": [
+    "[Kavach-Sandbox] Time dilution: compressed Thread.sleep(600000ms) -> 10ms"
+  ],
+  "llm_frida_intercepts": [
+    "[LLM-Frida-Hook] Intercepted javax.crypto.Cipher.doFinal() Decrypted Plaintext: https://stealer-command-node.xyz/gate.php"
+  ],
+  "fuzzed_intents": [
+    {
+      "action": "android.intent.action.BOOT_COMPLETED",
+      "flags": "0x00000020",
+      "status": "DELIVERED"
+    }
+  ]
 }

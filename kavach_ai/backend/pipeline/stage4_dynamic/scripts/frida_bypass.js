@@ -362,5 +362,54 @@ Java.perform(function () {
         console.log("[Kavach-Sandbox] Runtime Native Load hooks skipped: " + e);
     }
 
+    // ==========================================
+    // 4. CHRONOS TIME DILUTION ENGINE (Active Sleep Defusal)
+    // ==========================================
+    try {
+        const Thread = Java.use("java.lang.Thread");
+        
+        // Hook Thread.sleep(long millis)
+        Thread.sleep.overload('long').implementation = function (millis) {
+            let originalMillis = millis;
+            if (millis > 50) {
+                let scaledMillis = 10;
+                console.log("[Kavach-Sandbox] Time dilution: compressed Thread.sleep(" + originalMillis + "ms) -> " + scaledMillis + "ms");
+                return this.sleep(scaledMillis);
+            }
+            return this.sleep(millis);
+        };
+
+        // Hook Thread.sleep(long millis, int nanos)
+        Thread.sleep.overload('long', 'int').implementation = function (millis, nanos) {
+            let originalMillis = millis;
+            if (millis > 50) {
+                let scaledMillis = 10;
+                console.log("[Kavach-Sandbox] Time dilution: compressed Thread.sleep(" + originalMillis + "ms, " + nanos + "ns) -> " + scaledMillis + "ms");
+                return this.sleep(scaledMillis, 0);
+            }
+            return this.sleep(millis, nanos);
+        };
+    } catch (e) {
+        console.log("[Kavach-Sandbox] Thread.sleep hook setup skipped: " + e);
+    }
+
+    try {
+        const SystemClock = Java.use("android.os.SystemClock");
+        
+        // Hook SystemClock.sleep(long ms)
+        SystemClock.sleep.implementation = function (ms) {
+            let originalMs = ms;
+            if (ms > 50) {
+                let scaledMs = 15;
+                console.log("[Kavach-Sandbox] Time dilution: compressed SystemClock.sleep(" + originalMs + "ms) -> " + scaledMs + "ms");
+                return this.sleep(scaledMs);
+            }
+            return this.sleep(ms);
+        };
+    } catch (e) {
+        console.log("[Kavach-Sandbox] SystemClock.sleep hook setup skipped: " + e);
+    }
+
     console.log("[Kavach-Sandbox] Hooks active!");
 });
+

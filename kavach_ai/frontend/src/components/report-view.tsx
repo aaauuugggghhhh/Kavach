@@ -1,15 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useDetonation } from '@/context/DetonationContext';
-import { Download, FileSearch, Network, Globe, ShieldCheck, Crosshair, Search } from 'lucide-react';
+import { 
+  Download, 
+  FileSearch, 
+  Network, 
+  Globe, 
+  ShieldCheck, 
+  Crosshair, 
+  Search,
+  Zap,
+  Clock,
+  Radio,
+  Key,
+  Eye
+} from 'lucide-react';
 
 export const ReportView: React.FC = () => {
   const { telemetry, apkDetails, reset, logs = [] } = useDetonation();
-  const [activeTab, setActiveTab] = useState<'files' | 'sockets' | 'dns' | 'permissions' | 'mitre'>('files');
+  const [activeTab, setActiveTab] = useState<'files' | 'sockets' | 'dns' | 'permissions' | 'mitre' | 'evasion'>('evasion');
   const [threatIntel, setThreatIntel] = useState<Record<string, any>>({});
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const objectionRoot = telemetry?.objection_root_bypass || false;
   const objectionSsl = telemetry?.objection_ssl_pinning_bypass || false;
+  const timeDilutionBypass = telemetry?.time_dilution_bypass || false;
+  const timeDilutionCount = telemetry?.time_dilution_count || (timeDilutionBypass ? 1 : 0);
+  const timeDilutionEvents = telemetry?.time_dilution_events || [];
+  const llmFridaIntercepts = telemetry?.llm_frida_intercepts || [];
+  const fuzzedIntents = telemetry?.fuzzed_intents || [];
   const filesAccessed = telemetry?.ebpf_telemetry?.files_accessed || [];
   const networkConns = telemetry?.ebpf_telemetry?.network_connections || [];
   const dnsResolutions = telemetry?.ebpf_telemetry?.dns_resolutions || [];
@@ -185,6 +203,7 @@ export const ReportView: React.FC = () => {
 
   // ── Tab config ──
   const tabs = [
+    { id: 'evasion' as const, label: 'Evasion Defusal & AI Hooks', icon: Zap },
     { id: 'files' as const, label: 'File I/O', icon: FileSearch },
     { id: 'sockets' as const, label: 'Network Sockets', icon: Network },
     { id: 'dns' as const, label: 'DNS Lookups', icon: Globe },
@@ -444,6 +463,133 @@ export const ReportView: React.FC = () => {
 
       {/* ═══ Evidence Panel ═══ */}
       <div className="border-x border-b border-border rounded-none bg-card overflow-hidden p-6">
+
+        {/* ── Evasion Defusal & AI Hooks Tab ── */}
+        {activeTab === 'evasion' && (
+          <div className="space-y-6">
+            <div>
+              <span className="text-sm font-bold text-foreground">Active Evasion Defusal & Dynamic AI Interceptors</span>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Real-time sleep gate compression, IPC broadcast triggers, and static-to-dynamic LLM Frida memory dumps.
+              </p>
+            </div>
+
+            {/* 4-Column Evasion Defusal Matrix */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="p-3 border border-amber-500/30 bg-amber-500/5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-amber-400 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    Time Dilution
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">
+                    DEFUSED
+                  </span>
+                </div>
+                <div className="text-xs font-semibold text-foreground">
+                  {timeDilutionCount > 0 ? `${timeDilutionCount} Sleep Gate(s) Compressed` : 'Active Protection'}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  Scaled Thread.sleep() &gt;50ms down to 10ms to bypass observation delays.
+                </div>
+              </div>
+
+              <div className="p-3 border border-blue-500/30 bg-blue-500/5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-blue-400 flex items-center gap-1">
+                    <Radio className="w-3.5 h-3.5" />
+                    Apex IPC Fuzzing
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40">
+                    TRIGGERED
+                  </span>
+                </div>
+                <div className="text-xs font-semibold text-foreground">
+                  {fuzzedIntents.length > 0 ? `${fuzzedIntents.length} IPC Triggers Fired` : 'BOOT_COMPLETED & Receivers'}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  FLAG_INCLUDE_STOPPED_PACKAGES (0x00000020) forced dormant listeners to detonate.
+                </div>
+              </div>
+
+              <div className="p-3 border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Anti-Root Guard
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">
+                    {objectionRoot ? 'BYPASSED' : 'ACTIVE'}
+                  </span>
+                </div>
+                <div className="text-xs font-semibold text-foreground">
+                  {objectionRoot ? 'SU & Build Tags Spoofed' : 'Standard Runtime'}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  Neutralized integrity checks and su binary scans in ART VM.
+                </div>
+              </div>
+
+              <div className="p-3 border border-cyan-500/30 bg-cyan-500/5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-cyan-400 flex items-center gap-1">
+                    <Zap className="w-3.5 h-3.5" />
+                    SSL Pinning
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40">
+                    {objectionSsl ? 'BYPASSED' : 'ACTIVE'}
+                  </span>
+                </div>
+                <div className="text-xs font-semibold text-foreground">
+                  {objectionSsl ? 'TrustAllCerts Injected' : 'TLS Verification'}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  Disabled certificate pinning to inspect encrypted command channels.
+                </div>
+              </div>
+            </div>
+
+            {/* Synthesized Interceptors & Dumped Memory */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-cyan-400" />
+                  LLMFrida Synthesized Interceptors & Decrypted Memory Dumps
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  Groq Qwen-2.5 Synthesizer
+                </span>
+              </div>
+
+              <div className="bg-zinc-950 border border-border divide-y divide-border/60">
+                {llmFridaIntercepts.length === 0 ? (
+                  <div className="p-4 text-xs text-muted-foreground/60 italic text-center">
+                    No custom obfuscated crypto sinks intercepted in this run.
+                  </div>
+                ) : (
+                  llmFridaIntercepts.map((intercept, idx) => (
+                    <div key={idx} className="p-3 flex items-start gap-2.5 font-mono text-xs">
+                      <Eye className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <span className="text-cyan-300 font-semibold block">{intercept}</span>
+                        <span className="text-[10px] text-muted-foreground">Captured at runtime via dynamic Dalvik memory hook</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {timeDilutionEvents.length > 0 && timeDilutionEvents.map((evt, idx) => (
+                  <div key={`td-${idx}`} className="p-3 flex items-start gap-2.5 font-mono text-xs">
+                    <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <span className="text-amber-300 font-semibold block">{evt}</span>
+                      <span className="text-[10px] text-muted-foreground">Chronos Time Dilution defusal log</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── File I/O Tab ── */}
         {activeTab === 'files' && (

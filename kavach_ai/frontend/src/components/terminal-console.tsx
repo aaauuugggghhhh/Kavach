@@ -40,10 +40,11 @@ export const TerminalConsole: React.FC = () => {
 
   const dynamicSteps = [
     { label: 'APK Parse & Load', time: '0.0s', active: checkEvent(['receiving', 'extracting', 'package']) },
-    { label: 'Emulator Installation', time: '1.2s', active: checkEvent(['installing', 'device', 'emulator-']) },
-    { label: 'Frida Server Spawn', time: '2.5s', active: checkEvent(['frida', 'hooks']) },
-    { label: 'Objection Safeguards Bypass', time: '4.1s', active: checkEvent(['objection', 'root', 'ssl']) },
-    { label: 'Receivers Detonation', time: '5.8s', active: checkEvent(['trojan', 'intents', 'boot_completed']) },
+    { label: 'LLMFrida Hook Synthesis', time: '1.0s', active: checkEvent(['llmfrida', 'synthesiz', 'groq']) },
+    { label: 'Sandbox Spawn & Instrumentation', time: '2.5s', active: checkEvent(['frida', 'hooks', 'installing']) },
+    { label: 'Anti-Analysis Safeguard Bypass', time: '3.8s', active: checkEvent(['objection', 'root', 'ssl', 'spoofed']) },
+    { label: 'Time Dilution (Sleep Defusal)', time: '5.2s', active: checkEvent(['time dilution', 'time-dilution', 'defused']) },
+    { label: 'Apex IPC Intent Fuzzing', time: '6.5s', active: checkEvent(['apex-fuzzer', 'fuzzer', 'broadcast', 'boot_completed']) },
     { label: 'Telemetry Logs Synced', time: `${detonationDuration.toFixed(1)}s`, active: checkEvent(['complete', 'syncing', 'telemetry']) },
   ];
 
@@ -140,15 +141,48 @@ export const TerminalConsole: React.FC = () => {
             ) : (
               logs.map((log, idx) => {
                 let colorClass = 'text-muted-foreground';
-                if (log.toLowerCase().includes('[error]')) colorClass = 'text-red-400';
-                else if (log.toLowerCase().includes('[warn]')) colorClass = 'text-amber-400';
-                else if (log.toLowerCase().includes('[sim]') || log.toLowerCase().includes('[info]')) colorClass = 'text-blue-400';
-                else if (log.toLowerCase().includes('success') || log.toLowerCase().includes('complete')) colorClass = 'text-emerald-400';
+                let tagBadge = null;
+
+                if (log.includes('[LLM-Frida-Hook]') || log.includes('[LLMFrida]')) {
+                  colorClass = 'text-cyan-300 font-medium';
+                  tagBadge = (
+                    <span className="text-[9px] font-mono px-1 py-0.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 mr-1.5">
+                      LLM-FRIDA
+                    </span>
+                  );
+                } else if (log.includes('[Time-Dilution]') || log.toLowerCase().includes('time dilution')) {
+                  colorClass = 'text-amber-300 font-medium';
+                  tagBadge = (
+                    <span className="text-[9px] font-mono px-1 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 mr-1.5">
+                      TIME-DILUTION
+                    </span>
+                  );
+                } else if (log.includes('[Apex-Fuzzer]') || log.toLowerCase().includes('fuzzer')) {
+                  colorClass = 'text-blue-300 font-medium';
+                  tagBadge = (
+                    <span className="text-[9px] font-mono px-1 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/30 mr-1.5">
+                      APEX-FUZZER
+                    </span>
+                  );
+                } else if (log.toLowerCase().includes('[error]')) {
+                  colorClass = 'text-red-400';
+                } else if (log.toLowerCase().includes('[warn]')) {
+                  colorClass = 'text-amber-400';
+                } else if (log.toLowerCase().includes('[sim]') || log.toLowerCase().includes('[info]')) {
+                  colorClass = 'text-blue-400';
+                } else if (log.toLowerCase().includes('success') || log.toLowerCase().includes('complete')) {
+                  colorClass = 'text-emerald-400';
+                }
                 
                 return (
-                  <div key={idx} className={colorClass}>
-                    <span className="text-muted-foreground/30 select-none mr-2">{(idx + 1).toString().padStart(2, '0')}</span>
-                    {log}
+                  <div key={idx} className={`flex items-start ${colorClass}`}>
+                    <span className="text-muted-foreground/30 select-none mr-2 shrink-0">
+                      {(idx + 1).toString().padStart(2, '0')}
+                    </span>
+                    <div>
+                      {tagBadge}
+                      <span>{log}</span>
+                    </div>
                   </div>
                 );
               })

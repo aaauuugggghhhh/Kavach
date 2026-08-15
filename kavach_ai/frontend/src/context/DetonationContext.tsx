@@ -32,6 +32,12 @@ export interface TelemetryPayload {
   execution_mode?: 'LIVE_ADB_FRIDA' | 'SIMULATION_FALLBACK';
   objection_root_bypass: boolean;
   objection_ssl_pinning_bypass: boolean;
+  time_dilution_bypass?: boolean;
+  time_dilution_count?: number;
+  time_dilution_events?: string[];
+  llm_frida_intercepts?: string[];
+  fuzzed_intents?: any[];
+  synthesized_hooks_code?: string;
   ebpf_telemetry: EbpfTelemetry;
   native_libraries?: string[];
 }

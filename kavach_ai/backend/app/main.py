@@ -7,8 +7,10 @@ import asyncio
 import hashlib
 import traceback
 import uuid
+from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 # Initialize environment variables
 load_dotenv()
@@ -394,11 +396,42 @@ async def get_recent_scan():
     }
 
 
+class LLMFridaPreviewRequest(BaseModel):
+    package_name: Optional[str] = "com.target.malware"
+    sinks: Optional[list] = None
+
+@app.post("/api/llm-frida/preview")
+async def preview_llm_frida_script(req: LLMFridaPreviewRequest):
+    """
+    Generates a real-time preview of the synthesized LLM Frida script for an APK/package.
+    """
+    try:
+        from kavach_ai.backend.pipeline.stage4_dynamic.llm_frida_synthesizer import LLMFridaSynthesizer
+        synthesizer = LLMFridaSynthesizer()
+        script = synthesizer.generate_hooks_from_sinks(
+            sinks=req.sinks,
+            package_name=req.package_name
+        )
+        return {
+            "status": "success",
+            "package_name": req.package_name,
+            "script": script,
+            "engine": "LLMFrida-Synthesizer (Groq qwen2.5-coder-32b-instruct)"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "script": "// Fallback hook template error: " + str(e)
+        }
+
 @app.post("/api/detonate-stream")
 async def detonate_stream(
     file: UploadFile = File(...),
     simulation: bool = Query(False),
-    duration: int = Query(10)
+    duration: int = Query(10),
+    enable_llm_frida: bool = Query(True),
+    enable_fuzzing: bool = Query(True)
 ):
     loop = asyncio.get_running_loop()
     queue = asyncio.Queue()
@@ -461,36 +494,50 @@ async def detonate_stream(
 
             # 2. Run Pipeline (simulation or active VM)
             if simulation:
-                yield f"data: {json.dumps({'type': 'log', 'message': '[Sim] Simulation Mode active. Detonating mock trojan components...'})}\n\n"
-                # Mock running progress output log stream
+                yield f"data: {json.dumps({'type': 'log', 'message': '[Sim] Simulation Mode active. Booting sandbox telemetry...'})}\n\n"
                 mock_logs = [
+                    f"[LLMFrida] Prompting Groq (qwen2.5-coder-32b-instruct) for {package_name} static sinks...",
+                    "[LLMFrida] Successfully synthesized 3 targeted dynamic interceptors.",
                     "Starting eBPF logging session for: " + package_name,
                     "Connected Android device found: emulator-5554",
-                    "Installing APK path: mock_malware.apk",
+                    "Installing APK path: " + file.filename,
                     "Spawning Frida process: hooks injected successfully",
-                    "Bypassing Android Root safeguards... SUCCESS",
-                    "Bypassing SSL Pinning certification... SUCCESS",
-                    "Waking up banking trojan intents: android.intent.action.BOOT_COMPLETED",
-                    "Tracing kernel IO syscalls...",
+                    "Bypassing Android Root safeguards... SUCCESS (ro.build.tags spoofed)",
+                    "Bypassing SSL Pinning certification... SUCCESS (TrustAllCerts active)",
+                    "[Time-Dilution] Malware called Thread.sleep(600000ms - 10 min sleep gate)",
+                    "[Time-Dilution] >> DEFUSED! Compressed 600000ms -> 10ms. Execution resumed.",
+                    "[Apex-Fuzzer] Firing broadcast intent: android.intent.action.BOOT_COMPLETED (flag=0x00000020)",
+                    "[Apex-Fuzzer] Receiver stimulated: " + package_name + ".BootReceiver",
+                    "[LLM-Frida-Hook] Intercepted javax.crypto.Cipher.doFinal() Decrypted Plaintext: https://stealer-command-node.xyz/gate.php",
+                    "Tracing kernel IO syscalls: sys_clone, sys_openat, sys_connect",
                     "Telemetry gather complete. Syncing report JSON..."
                 ]
                 for m_log in mock_logs:
-                    await asyncio.sleep(0.8)
+                    await asyncio.sleep(0.6)
                     yield f"data: {json.dumps({'type': 'log', 'message': m_log})}\n\n"
                 
-                # Fetch mock telemetry payload
                 from backend.pipeline.stage4_dynamic.scripts.ebpf_trace import EBPFTracker
                 tracker = EBPFTracker()
                 telemetry = tracker.generate_mock_telemetry(package_name)
+                telemetry["time_dilution_bypass"] = True
+                telemetry["time_dilution_count"] = 1
+                telemetry["llm_frida_intercepts"] = [
+                    "[LLM-Frida-Hook] Intercepted javax.crypto.Cipher.doFinal() Decrypted Plaintext: https://stealer-command-node.xyz/gate.php"
+                ]
+                telemetry["fuzzed_intents"] = [
+                    {"action": "android.intent.action.BOOT_COMPLETED", "flags": "0x00000020", "status": "DELIVERED"}
+                ]
             else:
-                yield f"data: {json.dumps({'type': 'log', 'message': 'Booting local sandbox orchestration...'})}\n\n"
+                yield f"data: {json.dumps({'type': 'log', 'message': 'Booting local sandbox orchestration with LLMFrida & Active Evasion Defusal...'})}\n\n"
                 # Run the blocking pipeline execution in a thread
                 task = asyncio.create_task(
                     asyncio.to_thread(
                         run_dynamic_analysis_pipeline,
                         apk_path=temp_path,
                         package_name=package_name,
-                        duration_seconds=duration
+                        duration_seconds=duration,
+                        enable_llm_frida=enable_llm_frida,
+                        enable_fuzzing=enable_fuzzing
                     )
                 )
                 

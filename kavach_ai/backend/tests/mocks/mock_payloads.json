@@ -24,7 +24,7 @@
   "ml_attribution": {
     "slice_id": 1,
     "classification_score": 0.985,
-    "shap_attributions": [
+    "lrp_attributions": [
       {"token": "SmsManager", "weight": 0.420},
       {"token": "sendTextMessage", "weight": 0.380},
       {"token": "RECEIVE_SMS", "weight": 0.120},

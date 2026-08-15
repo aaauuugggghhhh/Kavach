@@ -79,10 +79,13 @@ class SecureBERTInferenceEngine:
             
             print(f"[ML Inference] Loading base SecureBERT model from: {self.base_path} on {self.device}")
             self.tokenizer = AutoTokenizer.from_pretrained(self.base_path, local_files_only=self.is_local)
+            
+            # Load with eager attention implementation to enable output_attentions=True (required for ModernBERT LRP)
             self.base_model = AutoModelForSequenceClassification.from_pretrained(
                 self.base_path,
                 num_labels=2,
-                local_files_only=self.is_local
+                local_files_only=self.is_local,
+                attn_implementation="eager"
             ).to(self.device)
             self.base_model.eval()
 
@@ -127,7 +130,7 @@ class SecureBERTInferenceEngine:
             self.current_adapter_id = model_id
 
     def classify_slices(self, slices: List[str], model_id: str = "securebert-full-weighted") -> Dict[str, Any]:
-        """Runs classification over extracted Dalvik program slices."""
+        """Runs classification over extracted Dalvik program slices and computes Attention LRP relevance scores."""
         self.load_adapter(model_id)
 
         if not slices:
@@ -143,27 +146,90 @@ class SecureBERTInferenceEngine:
         slice_scores = []
         slice_evals = []
 
-        with torch.no_grad():
+        # Hook to store intermediate attention probabilities from the eager model layers
+        attention_probs_tensors = []
+
+        def save_attn_probs(module, input, output):
+            if isinstance(output, tuple) and len(output) > 1:
+                attn_probs = output[1]
+                if attn_probs is not None:
+                    attn_probs.retain_grad()
+                    attention_probs_tensors.append(attn_probs)
+
+        # Register forward hooks on attention blocks
+        hooks = []
+        for name, module in self.active_model.named_modules():
+            if "attention" in name.lower() or "attn" in name.lower():
+                hooks.append(module.register_forward_hook(save_attn_probs))
+
+        # Temporarily enable requires_grad on all parameters to track gradients through frozen layers for LRP
+        original_requires_grad = {}
+        for name, param in self.active_model.named_parameters():
+            original_requires_grad[name] = param.requires_grad
+            param.requires_grad = True
+
+        try:
             for idx, code_slice in enumerate(slices[:15]): # Cap at top 15 slices for performance
+                # Clear lists from previous loop iterations
+                attention_probs_tensors.clear()
+
                 inputs = self.tokenizer(
                     code_slice,
                     padding="max_length",
                     truncation=True,
-                    max_length=512,
+                    max_length=128,  # Truncate to 128 for real-time inference latency
                     return_tensors="pt"
                 ).to(self.device)
 
-                outputs = self.active_model(**inputs)
+                # Forward pass tracking gradients for LRP backward calculation
+                outputs = self.active_model(**inputs, output_attentions=True)
                 logits = outputs.logits
                 probs = torch.softmax(logits, dim=-1).squeeze().tolist()
                 
                 malicious_prob = probs[1] if isinstance(probs, list) and len(probs) > 1 else 0.0
                 slice_scores.append(malicious_prob)
+
+                # Compute Attention LRP relevance backpropagation: R = (A * grad_A)^+
+                relevance_tokens = []
+                self.active_model.zero_grad()
+
+                if logits.shape[0] > 0 and len(attention_probs_tensors) > 0:
+                    score = logits[0, 1]
+                    score.backward(retain_graph=True)
+                    
+                    last_layer_attn = attention_probs_tensors[-1]
+                    if last_layer_attn.grad is not None:
+                        relevance = torch.clamp(last_layer_attn * last_layer_attn.grad, min=0)
+                        # Average relevance across attention heads: shape (seq, seq)
+                        relevance_map = relevance[0].mean(dim=0)
+                        # Sum over column to extract token importance weights: shape (seq,)
+                        token_relevance = relevance_map.sum(dim=-1).tolist()
+                        
+                        # Translate input tokens and sanitize space prefixes
+                        input_ids_list = inputs["input_ids"][0].tolist()
+                        tokens = self.tokenizer.convert_ids_to_tokens(input_ids_list)
+                        
+                        for token, rel_val in zip(tokens, token_relevance):
+                            if token not in ("<pad>", "[PAD]", "[CLS]", "[SEP]"):
+                                clean_token = token.replace("Ġ", " ")
+                                relevance_tokens.append([clean_token, round(rel_val, 6)])
+                    
+                # Format slice assessment payload
                 slice_evals.append({
                     "slice_index": idx + 1,
                     "malicious_probability": round(malicious_prob, 4),
-                    "code_snippet": code_slice[:200] + "..." if len(code_slice) > 200 else code_slice
+                    "code_snippet": code_slice[:200] + "..." if len(code_slice) > 200 else code_slice,
+                    "relevance_tokens": relevance_tokens
                 })
+        finally:
+            # Restore original requires_grad states to preserve training/adapter frozen boundaries
+            for name, param in self.active_model.named_parameters():
+                if name in original_requires_grad:
+                    param.requires_grad = original_requires_grad[name]
+
+            # Clean up all registered forward hooks to prevent PyTorch memory leaks
+            for hook in hooks:
+                hook.remove()
 
         max_prob = max(slice_scores) if slice_scores else 0.0
         mean_prob = sum(slice_scores) / len(slice_scores) if slice_scores else 0.0

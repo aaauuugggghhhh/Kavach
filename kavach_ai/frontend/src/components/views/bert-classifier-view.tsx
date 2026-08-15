@@ -9,6 +9,50 @@ import {
   ResponsiveContainer, Cell, LineChart, Line 
 } from 'recharts';
 
+
+const renderHighlightedCode = (snippet: string, relevanceTokens: any[]) => {
+  if (!relevanceTokens || relevanceTokens.length === 0) {
+    return <span>{snippet}</span>;
+  }
+  
+  // Create a map of token -> relevance for fast lookup
+  const relevanceMap: Record<string, number> = {};
+  let maxWeight = 0.0001;
+  relevanceTokens.forEach(([tok, val]) => {
+    const t = tok.trim();
+    if (t) {
+      relevanceMap[t.toLowerCase()] = val;
+      if (val > maxWeight) maxWeight = val;
+    }
+  });
+
+  // Split the snippet by spaces, tabs, newlines, and operators to preserve format
+  const tokens = snippet.split(/(\s+|<-|->|[{}():;,])/g);
+  
+  return tokens.map((token, tIdx) => {
+    if (!token) return null;
+    const cleanToken = token.trim().toLowerCase();
+    const weight = relevanceMap[cleanToken];
+    
+    if (weight && weight > 0.0001) {
+      const intensity = weight / maxWeight;
+      const bgColor = `rgba(239, 68, 68, ${Math.min(0.1 + intensity * 0.45, 0.6)})`;
+      const textColor = '#fca5a5'; // Light red text for dark mode contrast
+      return (
+        <span 
+          key={tIdx} 
+          className="font-bold px-0.5 rounded-[2px] cursor-help transition-all border-b border-red-500/20"
+          style={{ backgroundColor: bgColor, color: textColor }}
+          title={`Attention LRP Relevance Score: ${weight.toFixed(6)}`}
+        >
+          {token}
+        </span>
+      );
+    }
+    return <span key={tIdx}>{token}</span>;
+  });
+};
+
 export const BertClassifierView: React.FC = () => {
   const { staticResults, availableModels } = useDetonation();
   const mlData = staticResults?.ml_metrics;
@@ -312,10 +356,10 @@ export const BertClassifierView: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column (col-span-3): SHAP Importance Chart */}
+        {/* Right Column (col-span-3): LRP Importance Chart */}
         <div className="lg:col-span-3 border border-border bg-card flex flex-col">
           <div className="p-4 border-b border-border bg-secondary/30 flex items-center justify-between">
-            <span className="text-xs font-bold text-foreground">SHAP Feature Weights</span>
+            <span className="text-xs font-bold text-foreground">LRP Slice Threat Relevance</span>
             <Sliders className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
           <div className="p-4 flex-1 flex flex-col justify-center">
@@ -347,7 +391,7 @@ export const BertClassifierView: React.FC = () => {
               </ResponsiveContainer>
             </div>
             <p className="text-[10px] text-muted-foreground text-center mt-3">
-              Weighted feature impact. Red indicates malicious push; green represents benign fallback traits.
+              Attention-based Layer-wise Relevance Propagation (LRP) slice weights. Red indicates positive (malicious) relevance; green represents benign fallback traits.
             </p>
           </div>
         </div>
@@ -514,7 +558,7 @@ export const BertClassifierView: React.FC = () => {
                         <div className="px-3.5 pb-3.5 pt-0 animate-in slide-in-from-top-2 fade-in duration-200">
                           <div className="bg-[#09090b] border border-border p-3 overflow-x-auto">
                             <pre className="text-xs leading-relaxed font-mono text-zinc-300 whitespace-pre-wrap break-all">
-                              <code>{se.code_snippet}</code>
+                              <code>{renderHighlightedCode(se.code_snippet, se.relevance_tokens)}</code>
                             </pre>
                           </div>
                         </div>
