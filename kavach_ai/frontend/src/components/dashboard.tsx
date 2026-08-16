@@ -12,6 +12,7 @@ import { SandboxHealthView } from '@/components/views/sandbox-health-view';
 import { SettingsView } from '@/components/views/settings-view';
 import { ApiCredentialsView } from '@/components/views/api-credentials-view';
 import { KavachReportView } from '@/components/views/kavach-report-view';
+import { InvestigationPlanView } from '@/components/views/investigation-plan-view';
 import { AlertCircle } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -76,6 +77,10 @@ export const Dashboard: React.FC = () => {
 
   if (currentView === 'kavach_report') {
     return <KavachReportView />;
+  }
+
+  if (currentView === 'investigation_plan') {
+    return <InvestigationPlanView />;
   }
 
   switch (status) {
